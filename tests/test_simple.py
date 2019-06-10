@@ -11,5 +11,5 @@ def test_load():
 
 
 def test_trajectory():
-    res = traj.poly3_pos_vel(x_list=[1, 1, 1], v_list=[1, 1, 1], T=[1, 1])
-    plt.plot(res['t'], res['x'])
+    res = traj.plan_min_snap([1, 2, 3], [1, 2])
+    res.plot()
