@@ -9,4 +9,4 @@ def main():
 def load_file():
     data_file = pkg_resources.resource_filename('bswarm', 'data/package_data.dat')
     with open(data_file, 'r') as f:
-        print(f)
+        print(f.read())
