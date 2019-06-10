@@ -207,24 +207,32 @@ def plan_min_snap(x_list, T):
 
     eq_num = 0
     for i in range(n_legs):
-        # p1(0) = x[0]
-        A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
-            beta=0, m=0, n=n, T=T[i])
-        b[eq_num] = x_list[i]
-        eq_num += 1
 
-        # initial conitions
-        if i == 0:
-            for m in [1, 2, 3, 4]:
-                # p0^m(0) = 0
-                A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
-                    beta=0, m=m, n=n, T=T[i])
+        # conditions
+        for m in [0, 1, 2]:
+            # p0^(m)(0) = 0
+            A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
+                beta=0, m=m, n=n, T=T[i])
+            if m == 0:
+                b[eq_num] = x_list[i]
+            else:
                 b[eq_num] = 0
-                eq_num += 1
-        
+            eq_num += 1
+
+        # initial conditions
+        if i == 0:
+            # p(0)^4(0) = 0
+            A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
+                beta=0, m=4, n=n, T=T[i])
+            if m == 0:
+                b[eq_num] = x_list[i+1]
+            else:
+                b[eq_num] = 0
+            eq_num += 1
+
         # final conditions
         if i == n_legs - 1:
-            for m in [0, 1, 2, 3, 4]:
+            for m in [0, 1, 2, 3]:
                 # p(n-1)^m(1) = 0
                 A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
                     beta=1, m=m, n=n, T=T[i])
