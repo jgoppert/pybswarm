@@ -56,7 +56,7 @@ drone_list = []
 T = 10 * np.ones(dist.shape[0])
 
 for drone in range(waypoints.shape[2]):
-    planner = tgen.plan_min_snap
+    planner = tgen.plan_min_accel
     trajx = planner(waypoints[:, 0, drone], T)
     trajy = planner(waypoints[:, 1, drone], T)
     drone_list.append([trajx, trajy])
