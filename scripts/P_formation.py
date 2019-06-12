@@ -8,7 +8,6 @@ filename = inspect.getframeinfo(inspect.currentframe()).filename
 path = os.path.dirname(os.path.abspath(filename))
 root_dir = os.path.join(path, os.path.pardir)
 sys.path.insert(0, root_dir)
-print('path', root_dir)
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -74,7 +73,6 @@ drone_list = []
 T = 10 * np.ones(dist.shape[0])
 
 for drone in range(waypoints.shape[2]):
-    print('drone', drone)
     planner = tgen.plan_min_snap
     trajx = planner(waypoints[:, 0, drone], T)
     trajy = planner(waypoints[:, 1, drone], T)
