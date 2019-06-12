@@ -1,8 +1,15 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
+"""
+This module can be used for planning trajectories for differentially flat systems.
+"""
+
 
 class Trajectory:
+    """
+    This is the trajectory data that is returned frome the planning functions.
+    """
 
     def __init__(self, c, T, n):
         self.c = c
@@ -136,6 +143,8 @@ def solve_trajectory(A: np.array, b: np.array, T: list, n: int):
 
 def plan_min_accel(x_list, T):
     """
+    Plan a minimum acceleration trajectory.
+
     @param x_list: position list
     @param T: duration list, length one less than x/v list
     """
@@ -163,8 +172,8 @@ def plan_min_accel(x_list, T):
                 A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
                     beta=0, m=m, n=n, T=T[i])
                 b[eq_num] = 0
-                eq_num += 1 
-        
+                eq_num += 1
+
         # final conditions
         if i == n_legs - 1:
             for m in [0, 1]:
@@ -172,7 +181,7 @@ def plan_min_accel(x_list, T):
                 A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
                     beta=1, m=m, n=n, T=T[i])
                 if m == 0:
-                    b[eq_num] = x_list[i+1]
+                    b[eq_num] = x_list[i + 1]
                 else:
                     b[eq_num] = 0
                 eq_num += 1
@@ -181,18 +190,20 @@ def plan_min_accel(x_list, T):
         if i > 0:
             # p(i-1)^m(1) - p(i)^m(0) = 0
             for m in [0, 1, 2]:
-                A[eq_num, n * (i-1):n * i] = trajectory_coeff(
-                    beta=1, m=m, n=n, T=T[i-1])
+                A[eq_num, n * (i - 1):n * i] = trajectory_coeff(
+                    beta=1, m=m, n=n, T=T[i - 1])
                 A[eq_num, n * i:n * (i + 1)] = -trajectory_coeff(
                     beta=0, m=m, n=n, T=T[i])
                 b[eq_num] = 0
-                eq_num += 1     
+                eq_num += 1
 
     return solve_trajectory(A, b, T, n)
 
 
 def plan_min_snap(x_list, T):
     """
+    Plan a minimum snap trajectory.
+
     @param x_list: position list
     @param T: duration list, length one less than x/v list
     """
@@ -225,7 +236,7 @@ def plan_min_snap(x_list, T):
             A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
                 beta=0, m=4, n=n, T=T[i])
             if m == 0:
-                b[eq_num] = x_list[i+1]
+                b[eq_num] = x_list[i + 1]
             else:
                 b[eq_num] = 0
             eq_num += 1
@@ -237,7 +248,7 @@ def plan_min_snap(x_list, T):
                 A[eq_num, n * i:n * (i + 1)] = trajectory_coeff(
                     beta=1, m=m, n=n, T=T[i])
                 if m == 0:
-                    b[eq_num] = x_list[i+1]
+                    b[eq_num] = x_list[i + 1]
                 else:
                     b[eq_num] = 0
                 eq_num += 1
@@ -246,11 +257,11 @@ def plan_min_snap(x_list, T):
         if i > 0:
             # p(i-1)^m(1) - p(i)^m(0) = 0
             for m in [0, 1, 2, 3, 4]:
-                A[eq_num, n * (i-1):n * i] = trajectory_coeff(
-                    beta=1, m=m, n=n, T=T[i-1])
+                A[eq_num, n * (i - 1):n * i] = trajectory_coeff(
+                    beta=1, m=m, n=n, T=T[i - 1])
                 A[eq_num, n * i:n * (i + 1)] = -trajectory_coeff(
                     beta=0, m=m, n=n, T=T[i])
                 b[eq_num] = 0
-                eq_num += 1     
+                eq_num += 1
 
     return solve_trajectory(A, b, T, n)
