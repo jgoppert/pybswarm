@@ -1,5 +1,9 @@
 import pkg_resources
+import sys
 
+
+if sys.version_info[0] != 3:
+    raise ValueError("bswarm requires Python 3")
 
 def main():
     """Entry point for the application script"""
