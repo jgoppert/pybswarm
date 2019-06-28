@@ -10,12 +10,13 @@ waypoints = np.array([
     # x, y, z, yaw
     [0, 0, 1, 0],
     [0, 1, 1, 0],
+    [0, 1, 1, 0],
     [1, 1, 1, 0],
     [1, 0, 1, 0],
     [0, 0, 1, 0]
 ])
 T = 2*np.ones(len(waypoints) - 1)
-traj = tgen.min_snap_4d(waypoints, T)
+traj = tgen.min_snap_4d(waypoints, T, stop=True)
 res = traj.compute_inputs()
 print(res.max_data())
 

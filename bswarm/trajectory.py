@@ -179,7 +179,7 @@ class Trajectory4D:
         np.savetxt(filename, self.coef_array(), delimiter=',', fmt='%15g',header=header)
 
 
-def min_snap_1d(waypoints: List[List[float]], T: List[float]) -> Trajectory1D:
+def min_snap_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) -> Trajectory1D:
     n = 8
     S = np.hstack([0, np.cumsum(T)])
     legs = len(T)
@@ -200,39 +200,55 @@ def min_snap_1d(waypoints: List[List[float]], T: List[float]) -> Trajectory1D:
     A = np.zeros((n*legs, n*legs))
     eq = 0
     for leg in range(legs):
-        # every waypoint
-        for m in range(3):
-            A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
-            if m == 0:
-                b[eq] = waypoints[leg]
-            else:
-                b[eq] = 0
-            eq += 1
-        
-        # first waypoint
-        if leg == 0:
-            for m in [3]:
-                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
-                b[eq] = 0
-                eq += 1
-    
-        # last waypoint
-        if leg == legs - 1:
+        if stop:
+            # every waypoint
             for m in range(4):
-                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg+1], m=m, t0=S[leg])
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
                 if m == 0:
-                    b[eq] = waypoints[leg + 1]
+                    b[eq] = waypoints[leg]
                 else:
                     b[eq] = 0
                 eq += 1
-                
-        # continuity
-        if leg > 0:
-            for m in range(5):
-                A[eq, n*(leg-1):n*leg] = coef_weights(t=S[leg], m=m, t0=S[leg-1])
-                A[eq, n*leg:n*(leg + 1)] = -coef_weights(t=S[leg], m=m, t0=S[leg])
-                b[eq] = 0
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg+1], m=m, t0=S[leg])
+                if m == 0:
+                    b[eq] = waypoints[leg+1]
+                else:
+                    b[eq] = 0
                 eq += 1
+        else:
+            # every waypoint
+            for m in range(3):
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                if m == 0:
+                    b[eq] = waypoints[leg]
+                else:
+                    b[eq] = 0
+                eq += 1
+            
+            # first waypoint
+            if leg == 0:
+                for m in [3]:
+                    A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                    b[eq] = 0
+                    eq += 1
+        
+            # last waypoint
+            if leg == legs - 1:
+                for m in range(4):
+                    A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg+1], m=m, t0=S[leg])
+                    if m == 0:
+                        b[eq] = waypoints[leg + 1]
+                    else:
+                        b[eq] = 0
+                    eq += 1
+                    
+            # continuity
+            if leg > 0:
+                for m in range(5):
+                    A[eq, n*(leg-1):n*leg] = coef_weights(t=S[leg], m=m, t0=S[leg-1])
+                    A[eq, n*leg:n*(leg + 1)] = -coef_weights(t=S[leg], m=m, t0=S[leg])
+                    b[eq] = 0
+                    eq += 1
 
     if eq != n*legs:
         print('warning: equations: {:d}, coefficients: {:d}'.format(eq, n*legs))
@@ -244,11 +260,11 @@ def min_snap_1d(waypoints: List[List[float]], T: List[float]) -> Trajectory1D:
     return Trajectory1D(T, P_list)
 
 
-def min_snap_4d(waypoints: List[List[float]], T: List[float]) -> Trajectory4D:
-    traj_x = min_snap_1d(waypoints[:, 0], T)
-    traj_y = min_snap_1d(waypoints[:, 1], T)
-    traj_z = min_snap_1d(waypoints[:, 2], T)
-    traj_yaw = min_snap_1d(waypoints[:, 3], T)
+def min_snap_4d(waypoints: List[List[float]], T: List[float], stop :bool =False) -> Trajectory4D:
+    traj_x = min_snap_1d(waypoints[:, 0], T, stop)
+    traj_y = min_snap_1d(waypoints[:, 1], T, stop)
+    traj_z = min_snap_1d(waypoints[:, 2], T, stop)
+    traj_yaw = min_snap_1d(waypoints[:, 3], T, stop)
     return Trajectory4D(traj_x, traj_y, traj_z, traj_yaw)
 
 
