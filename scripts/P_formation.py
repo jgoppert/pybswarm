@@ -13,7 +13,7 @@ import json
 
 #%% A flat P formation.
 
-P = np.array([
+P = 2*np.array([
     [-1, 1, 1],
     [0, 1, 1],
     [1, 1, 1],
@@ -30,7 +30,7 @@ plt.show()
 
 #%% A slanted P formation.
 
-P2 = np.array([
+P2 = 2*np.array([
     [-1, 1, 2],
     [0, 1, 2],
     [1, 1, 2],
@@ -78,7 +78,7 @@ for drone in range(waypoints.shape[2]):
     trajectories.append(traj)
 
 tgen.plot_trajectories_3d(trajectories)
-tgen.trajectories_to_json(trajectories, '/tmp/data.json')
+tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
 plt.show()
 
 

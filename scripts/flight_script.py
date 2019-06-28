@@ -208,7 +208,7 @@ if __name__ == '__main__':
     factory = CachedCfFactory(rw_cache='./cache')
     uris = {trajectory_assigment[key] for key in trajectory_assigment.keys()}
     print("uris:", uris)
-    with open('json/p2u.json', 'r') as f:
+    with open('scripts/data/p_form.json', 'r') as f:
         traj_list = json.load(f)
     
     #building arguments list in swarm
