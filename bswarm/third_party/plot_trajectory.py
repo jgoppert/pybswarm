@@ -6,20 +6,13 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.gridspec as gridspec
 import argparse
 
-import uav_trajectory
+from . import uav_trajectory
 
-if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument("trajectory", type=str, help="CSV file containing trajectory")
-  parser.add_argument("--stretchtime", type=float, help="stretch time factor (smaller means faster)")
-  args = parser.parse_args()
+# modified from https://github.com/whoenig/uav_trajectories
 
+def plot_uav_trajectory(csv_file):
   traj = uav_trajectory.Trajectory()
-  traj.loadcsv(args.trajectory)
-
-  if args.stretchtime:
-    traj.stretchtime(args.stretchtime)
-
+  traj.loadcsv(csv_file)
   ts = np.arange(0, traj.duration, 0.01)
   evals = np.empty((len(ts), 15))
   for t, i in zip(ts, range(0, len(ts))):
@@ -73,6 +66,3 @@ if __name__ == "__main__":
   # ax = plt.subplot(gs[7, 0]) # row 5
   # ax.plot(ts, np.degrees(evals[:,14]))
   # ax.set_ylabel("pitch [deg]")
-
-  plt.show()
-

@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 import numpy as np
 
+# modified from https://github.com/whoenig/uav_trajectories
+
 def normalize(v):
   norm = np.linalg.norm(v)
   assert norm > 0
