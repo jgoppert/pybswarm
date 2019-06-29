@@ -1,4 +1,5 @@
 # general things to ignore
+cache/
 build/
 dist/
 *.egg-info/

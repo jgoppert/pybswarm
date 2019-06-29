@@ -13,15 +13,17 @@ import json
 
 #%% A flat P formation.
 
-P = 2*np.array([
-    [-1, 1, 1],
-    [0, 1, 1],
-    [1, 1, 1],
-    [-1, 0, 1],
-    [0, 0, 1],
-    [1, 0, 1],
-    [-1, -1, 1]
+scale = 0.7
+P = scale*np.array([
+    [-1, 1, 0],
+    [0, 1, 0],
+    [1, 1, 0],
+    [-1, 0, 0],
+    [0, 0, 0],
+    [1, 0, 0],
+    [-1, -1, 0]
 ]).T
+P[:, ]
 plt.figure()
 ax = plt.axes(projection='3d')
 ax.plot3D(P[0, :], P[1, :], P[2, :], 'ro')
@@ -30,26 +32,24 @@ plt.show()
 
 #%% A slanted P formation.
 
-P2 = 2*np.array([
-    [-1, 1, 2],
-    [0, 1, 2],
-    [1, 1, 2],
-    [-1, 0, 1.5],
-    [0, 0, 1.5],
-    [1, 0, 1.5],
-    [-1, -1, 1]
-]).T
+P2 = np.array(P)
+P2[2, :3] = 3
+P2[2, 3:6] = 1.5
+P2[2, 6] = 0
+
 plt.figure()
 ax = plt.axes(projection='3d')
-ax.plot3D(P[0, :], P[1, :], P[2, :], 'ro')
+#ax.plot3D(P[0, :], P[1, :], P[2, :], 'ro')
 ax.plot3D(P2[0, :], P2[1, :], P2[2, :], 'bo')
 plt.title('slanted P')
 plt.show()
 
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
-waypoints = [P]
-for theta in np.linspace(0, 2 * np.pi, 8):
-    waypoints.append(form.rotate_points_z(P2, theta))
+shift = np.array([[1, 0, 0]]).T
+waypoints = [P, P + shift]
+for theta in np.linspace(0, -2 * np.pi, 8):
+    waypoints.append(form.rotate_points_z(P2, theta) + shift)
+waypoints.append(P2)
 waypoints.append(P)
 waypoints = np.array(waypoints)
 
@@ -68,18 +68,25 @@ dist_max
 
 trajectories = []
 
-T = dist_max
+T = 3*np.ones(len(dist_max))
+T[2] = 6
+
+origin = np.array([2, 3, 2])
 
 for drone in range(waypoints.shape[2]):
-    pos_wp = waypoints[:, :, drone]
+    pos_wp = waypoints[:, :, drone] + origin
     yaw_wp = np.zeros((pos_wp.shape[0], 1))
     traj = tgen.min_snap_4d(
-        np.hstack([pos_wp, yaw_wp]), T)
+        np.hstack([pos_wp, yaw_wp]), T, stop=True)
     trajectories.append(traj)
 
 tgen.plot_trajectories_3d(trajectories)
 tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
 plt.show()
 
+
+#%%
+tgen.plot_trajectory_derivatives(trajectories[0])
+print('T', T)
 
 #%%

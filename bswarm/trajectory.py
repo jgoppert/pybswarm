@@ -335,3 +335,5 @@ def trajectories_to_json(trajectories: List[Trajectory4D], filename: str):
         formation[drone] = traj.coef_array().tolist()
     with open(filename, 'w') as f:
         json.dump(formation, f)
+
+#%%
