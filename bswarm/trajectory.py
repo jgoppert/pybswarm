@@ -63,9 +63,9 @@ class Trajectory1D:
         S = np.hstack([0, np.cumsum(self.T)])
         legs = len(self.T)
         for leg, Pi in enumerate(self.P):
-            ti = np.linspace(0, self.T[leg], 1000)
-            t_list.append(ti + S[leg])
-            y_list.append(Pi(ti))
+            gamma = np.linspace(0, self.T[leg], 1000)
+            t_list.append(gamma + S[leg])
+            y_list.append(Pi(gamma))
         return np.hstack(t_list), np.hstack(y_list)
 
 
@@ -297,7 +297,7 @@ def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) 
     for leg in range(legs):
         if stop:
             # every waypoint
-            for m in range(3):
+            for m in range(2):
                 A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
                 if m == 0:
                     b[eq] = waypoints[leg]
@@ -326,7 +326,7 @@ def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) 
                     A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
                     b[eq] = 0
                     eq += 1
-        
+
             # last waypoint
             if leg == legs - 1:
                 for m in range(2):
@@ -336,7 +336,7 @@ def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) 
                     else:
                         b[eq] = 0
                     eq += 1
-                    
+
             # continuity
             if leg > 0:
                 for m in range(2):
