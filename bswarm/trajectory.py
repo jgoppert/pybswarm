@@ -50,6 +50,13 @@ class Trajectory1D:
         print('T_scaled', T_scaled)
         return Trajectory1D(T_scaled, P_scaled)
 
+    def coef_array(self) -> np.array:
+        data = []
+        for Ti, xi in zip(self.T, self.P):
+            row = np.hstack([Ti, xi.coef])
+            data.append(row)
+        return np.array(data)
+
     def eval(self):
         t_list = []
         y_list = []
@@ -267,6 +274,92 @@ def min_snap_4d(waypoints: List[List[float]], T: List[float], stop :bool =False)
     traj_yaw = min_snap_1d(waypoints[:, 3], T, stop)
     return Trajectory4D(traj_x, traj_y, traj_z, traj_yaw)
 
+def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) -> Trajectory1D:
+    n = 4
+    S = np.hstack([0, np.cumsum(T)])
+    legs = len(T)
+    assert len(waypoints) == len(T) + 1
+
+    def coef_weights(t: float, m: int, t0: float):
+        """
+        Polynomial coefficient weights
+        :param t: time
+        :param m: derivative order
+        """
+        w = np.zeros(n)
+        for k in range(m, n):
+            w[k] = (t - t0)**(k-m)*math.factorial(k)/math.factorial(k-m)
+        return w
+        
+    b = np.zeros(n*legs)
+    A = np.zeros((n*legs, n*legs))
+    eq = 0
+    for leg in range(legs):
+        if stop:
+            # every waypoint
+            for m in range(3):
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                if m == 0:
+                    b[eq] = waypoints[leg]
+                else:
+                    b[eq] = 0
+                eq += 1
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg+1], m=m, t0=S[leg])
+                if m == 0:
+                    b[eq] = waypoints[leg+1]
+                else:
+                    b[eq] = 0
+                eq += 1
+        else:
+            # every waypoint
+            for m in [0]:
+                A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                if m == 0:
+                    b[eq] = waypoints[leg]
+                else:
+                    b[eq] = 0
+                eq += 1
+            
+            # first waypoint
+            if leg == 0:
+                for m in [1]:
+                    A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                    b[eq] = 0
+                    eq += 1
+        
+            # last waypoint
+            if leg == legs - 1:
+                for m in range(2):
+                    A[eq, n*leg:n*(leg + 1)] = coef_weights(t=S[leg+1], m=m, t0=S[leg])
+                    if m == 0:
+                        b[eq] = waypoints[leg + 1]
+                    else:
+                        b[eq] = 0
+                    eq += 1
+                    
+            # continuity
+            if leg > 0:
+                for m in range(2):
+                    A[eq, n*(leg-1):n*leg] = coef_weights(t=S[leg], m=m, t0=S[leg-1])
+                    A[eq, n*leg:n*(leg + 1)] = -coef_weights(t=S[leg], m=m, t0=S[leg])
+                    b[eq] = 0
+                    eq += 1
+
+    if eq != n*legs:
+        print('warning: equations: {:d}, coefficients: {:d}'.format(eq, n*legs))
+    c = np.linalg.pinv(A).dot(b)
+    P_list = []
+    for leg in range(legs):
+        Pi = Polynomial(c[n*leg:n*(leg + 1)])
+        P_list.append(Pi)
+    return Trajectory1D(T, P_list)
+
+def min_accel_4d(waypoints: List[List[float]], T: List[float], stop :bool =False) -> Trajectory4D:
+    traj_x = min_accel_1d(waypoints[:, 0], T, stop)
+    traj_y = min_accel_1d(waypoints[:, 1], T, stop)
+    traj_z = min_accel_1d(waypoints[:, 2], T, stop)
+    traj_yaw = min_accel_1d(waypoints[:, 3], T, stop)
+    return Trajectory4D(traj_x, traj_y, traj_z, traj_yaw)
 
 def plot_trajectory_derivatives(traj) -> None:
     names = ['pos', 'vel',
