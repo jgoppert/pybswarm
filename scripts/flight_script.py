@@ -46,7 +46,7 @@ trajectory_assigment = {
     2: DRONE15,
     3: DRONE3,
     4: DRONE7,
-    5: DRONE17,
+    5: DRONE14,
     #6: DRONE7,
     #7: DRONE17,
     #8: DRONE18,

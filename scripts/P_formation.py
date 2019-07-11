@@ -35,7 +35,7 @@ formTakeoff = np.array([
 ]).T
 plot_formation(formTakeoff, 'takeoff')
 #%% P
-letter_scale = np.array([1, 1.5, 1.5])
+letter_scale = np.array([1.5, 1.5, 1.5])
 formP = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [-0.5, 0, 1],
@@ -104,9 +104,9 @@ dist_max
 trajectories = []
 
 #T = 3*np.ones(len(dist_max))
-T = 20*np.ones(len(dist_max))
+T = 10*np.ones(len(dist_max))
 
-origin = np.array([1.5, 2, 1.5])
+origin = np.array([1.5, 2, 2])
 
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
