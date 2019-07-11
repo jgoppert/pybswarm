@@ -11,53 +11,88 @@ import bswarm.formation as form
 import bswarm
 import json
 
-#%% A flat P formation.
+def plot_formation(F, name):
+    plt.figure()
+    ax = plt.axes(projection='3d')
+    ax.plot3D(F[0, :], F[1, :], F[2, :], 'ro')
+    plt.title(name)
+    plt.show()
 
-scale = 0.7
-P = scale*np.array([
-    [-1, 1, 0],
-    [0, 1, 0],
-    [1, 1, 0],
-    [-1, 0, 0],
-    [0, 0, 0],
-    [1, 0, 0],
-    [-1, -1, 0]
+def scale_formation(form, scale):
+    formNew = np.copy(form)
+    for i in range(3):
+        formNew[i, :] *= scale[i]
+    return formNew
+
+#%% takeoff
+formTakeoff = np.array([
+    [-0.5, -1, 0],
+    [-0.5, 0, 0],
+    [-0.5, 1, 0],
+    [0.5, -1, 0],
+    [0.5, 0, 0],
+    [0.5, 1, 0],
 ]).T
-P[:, ]
-plt.figure()
-ax = plt.axes(projection='3d')
-ax.plot3D(P[0, :], P[1, :], P[2, :], 'ro')
-plt.title('flat P')
-plt.show()
+plot_formation(formTakeoff, 'takeoff')
+#%% P
+letter_scale = np.array([1, 1.5, 1.5])
+formP = scale_formation(np.array([
+    [-0.5, -0.5, 1],
+    [-0.5, 0, 1],
+    [-0.25, 0.5, 0.75],
+    [0, -0.5, 0.5],
+    [0.5, -0.5, 0],
+    [0, 0, 0.5],
+]).T, letter_scale)
+plot_formation(formP, 'P')
 
-#%% A slanted P formation.
+#%% U
+formU = scale_formation(np.array([
+    [-0.5, -0.5, 1],
+    [-0.5, 0.5, 1],
+    [0, 0.5, 0.5],
+    [0, -0.5, 0.5],
+    [0.5, -0.25, 0],
+    [0.5, 0.25, 0],
+]).T, letter_scale)
+plot_formation(formU, 'U')
+#%% 5
+form5 = scale_formation(np.array([
+    [-0.5, -0.5, 1],
+    [-0.5, 0.5, 1],
+    [0, 0.25, 0.5],
+    [0, -0.5, 0.5],
+    [0.5, -0.5, 0],
+    [0.5, 0.25, 0],
+]).T, letter_scale)
+plot_formation(form5, '5')
 
-P2 = np.array(P)
-P2[2, :3] = 3
-P2[2, 3:6] = 1.5
-P2[2, 6] = 0
+#%% 0
+form0 = scale_formation(np.array([
+    [-0.5, -0.25, 1],
+    [-0.5, 0.25, 1],
+    [0, 0.5, 0.5],
+    [0, -0.5, 0.5],
+    [0.5, -0.25, 0],
+    [0.5, 0.25, 0],
+]).T, letter_scale)
+plot_formation(form0, '0')
 
-plt.figure()
-ax = plt.axes(projection='3d')
-#ax.plot3D(P[0, :], P[1, :], P[2, :], 'ro')
-ax.plot3D(P2[0, :], P2[1, :], P2[2, :], 'bo')
-plt.title('slanted P')
-plt.show()
 
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
-shift = np.array([[1, 0, 0]]).T
-waypoints = [P, P + shift]
-for theta in np.linspace(0, -2 * np.pi, 8):
-    waypoints.append(form.rotate_points_z(P2, theta) + shift)
-waypoints.append(P2)
-waypoints.append(P)
-waypoints = np.array(waypoints)
+waypoints = np.array([
+    formTakeoff, formTakeoff,
+    formP, formP,
+    formU, formU,
+    form5, form5,
+    form0, form0,
+    formTakeoff, formTakeoff])
 
 plt.figure()
 ax = plt.axes(projection='3d')
 for point in range(waypoints.shape[2]):
     ax.plot3D(waypoints[:, 0, point], waypoints[:, 1, point], waypoints[:, 2, point], '-')
-    ax.view_init(azim=0, elev=40)
+    ax.view_init(azim=45, elev=40)
 plt.title('waypoints')
 plt.show()
 
@@ -68,10 +103,10 @@ dist_max
 
 trajectories = []
 
-T = 3*np.ones(len(dist_max))
-T[2] = 6
+#T = 3*np.ones(len(dist_max))
+T = 20*np.ones(len(dist_max))
 
-origin = np.array([2, 3, 2])
+origin = np.array([1.5, 2, 1.5])
 
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
@@ -86,7 +121,11 @@ plt.show()
 
 
 #%%
-tgen.plot_trajectory_derivatives(trajectories[0])
-print('T', T)
+for traj in trajectories:
+    tgen.plot_trajectory_derivatives(traj)
+    print('T', T)
+
+#%%
+
 
 #%%

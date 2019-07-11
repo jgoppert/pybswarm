@@ -22,31 +22,32 @@ DRONE2 = 'radio://0/70/2M/E7E7E7E703'
 DRONE3 = 'radio://0/70/2M/E7E7E7E704'
 DRONE4 = 'radio://0/70/2M/E7E7E7E705'
 DRONE5 = 'radio://0/70/2M/E7E7E7E706'
-DRONE6 = 'radio://1/80/2M/E7E7E7E707'
-DRONE7 = 'radio://1/80/2M/E7E7E7E708'
-DRONE8 = 'radio://1/80/2M/E7E7E7E709'
-DRONE9 = 'radio://1/80/2M/E7E7E7E710'
-DRONE10 = 'radio://1/80/2M/E7E7E7E711'
-DRONE11 = 'radio://0/80/2M/E7E7E7E712'
-DRONE12 = 'radio://0/80/2M/E7E7E7E713'
-DRONE13 = 'radio://0/80/2M/E7E7E7E714'
-DRONE14 = 'radio://0/80/2M/E7E7E7E715'
-DRONE15 = 'radio://0/80/2M/E7E7E7E716'
-DRONE16 = 'radio://0/80/2M/E7E7E7E717'
-DRONE17 = 'radio://0/80/2M/E7E7E7E718'
-DRONE18 = 'radio://0/80/2M/E7E7E7E719'
-
+DRONE6 = 'radio://0/80/2M/E7E7E7E707'
+DRONE7 = 'radio://0/80/2M/E7E7E7E708'
+DRONE8 = 'radio://0/80/2M/E7E7E7E709'
+DRONE9 = 'radio://0/80/2M/E7E7E7E710'
+DRONE10 = 'radio://0/80/2M/E7E7E7E711'
+DRONE11 = 'radio://0/90/2M/E7E7E7E712'
+DRONE12 = 'radio://0/90/2M/E7E7E7E713'
+DRONE13 = 'radio://0/90/2M/E7E7E7E714'
+DRONE14 = 'radio://0/90/2M/E7E7E7E715'
+DRONE15 = 'radio://0/100/2M/E7E7E7E716'
+DRONE16 = 'radio://0/100/2M/E7E7E7E717'
+DRONE17 = 'radio://0/100/2M/E7E7E7E718'
+DRONE18 = 'radio://0/100/2M/E7E7E7E719'
+DRONE19 = 'radio://0/100/2M/E7E7E7E720'
+DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 
 # List of URIs, comment the one you do not want to fly
 #DRONE4 ## Faulty Drone // Does not work
 trajectory_assigment = {
-    0: DRONE1,
-    1: DRONE0,
-    2: DRONE3,
-    3: DRONE2,
-    4: DRONE5,
-    5: DRONE6,
-    6: DRONE7,
+    0: DRONE9,
+    1: DRONE2,
+    2: DRONE15,
+    3: DRONE3,
+    4: DRONE7,
+    5: DRONE17,
+    #6: DRONE7,
     #7: DRONE17,
     #8: DRONE18,
     #9: DRONE10,
@@ -178,8 +179,8 @@ def go_sequence(scf: Crazyflie,trajectory: List, duration: float):
         trajectory_id = 1       
         commander = cf.high_level_commander # type: cflib.HighLevelCOmmander
         print("go")
-        commander.takeoff(1.0, 3.0)
-        time.sleep(6.0)
+        commander.takeoff(1.5, 3.0)
+        time.sleep(10.0)
         relative = False
         commander.start_trajectory(trajectory_id, 1.0, relative)
         time.sleep(duration)
@@ -191,8 +192,8 @@ def land_sequence(scf: Crazyflie,trajectory: List, duration: float):
         cf = scf.cf # type: Crazyflie
         commander = cf.high_level_commander # type: cflib.HighLevelCOmmander        
         print("land")
-        commander.land(0.0, 5.0)
-        time.sleep(5)
+        commander.land(0.0, 3.0)
+        time.sleep(3)
         commander.stop()
     except Exception as e:
         print(e)
