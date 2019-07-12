@@ -264,7 +264,7 @@ def go_sequence(scf: Crazyflie, trajectory: List):
         leg_duration = leg[0]
         # wait for leg to complete
         time.sleep(leg_duration)
-        color = color_cycle()
+        color = next(color_cycle)
         # change led color
         cf.param.set_value('ring.effect', '7')
         cf.param.set_value('ring.solidRed', color[0])
