@@ -43,12 +43,12 @@ DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 # List of URIs, comment the one you do not want to fly
 # DRONE4 ## Faulty Drone // Does not work
 trajectory_assigment = {
-    0: DRONE7,
-    1: DRONE1,
-    #2: DRONE6,
-    # 3: DRONE3,
-    # 4: DRONE7,
-    # 5: DRONE14,
+    0: DRONE15,
+    1: DRONE7,
+    2: DRONE1,
+    3: DRONE6,
+    4: DRONE0,
+    5: DRONE19,
     # 6: DRONE7,
     # 7: DRONE17,
     # 8: DRONE18,
