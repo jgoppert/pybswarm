@@ -90,6 +90,7 @@ def start_position_printing(scf):
 
 
 def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
+    print('Checking battery...')
     log_config = LogConfig(name='Battery', period_in_ms=500)
     log_config.add_variable('pm.vbat', 'float')
 
@@ -106,6 +107,7 @@ def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
 
 
 def check_state(scf: SyncCrazyflie, min_voltage=4.0):
+    print('Checking state.')
     log_config = LogConfig(name='State', period_in_ms=500)
     log_config.add_variable('stateEstimate.roll', 'float')
     log_config.add_variable('stateEstimate.pitch', 'float')
@@ -125,9 +127,8 @@ def check_state(scf: SyncCrazyflie, min_voltage=4.0):
                     raise Exception(msg)
             return
 
-
 def wait_for_position_estimator(scf: SyncCrazyflie):
-    print('Waiting for estimator to find position...')
+    print('Waiting for estimator to find position...',)
 
     log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
     log_config.add_variable('kalman.varPX', 'float')
@@ -163,9 +164,8 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
                     max_z - min_z) < threshold:
                 break
             else:
-                print("{} {} {}".
-                      format(max_x - min_x, max_y - min_y, max_z - min_z))
-
+                print("{:s}\t{:10g}\t{:10g}\t{:10g}".
+                      format(scf.cf.link_uri, max_x - min_x, max_y - min_y, max_z - min_z))
 
 def wait_for_param_download(scf: SyncCrazyflie):
     while not scf.cf.param.is_updated:
@@ -174,13 +174,12 @@ def wait_for_param_download(scf: SyncCrazyflie):
 
 
 def reset_estimator(scf: SyncCrazyflie):
-    print("Reset Estimator")
+    print('Resetting estimator...')
     cf = scf.cf
     cf.param.set_value('kalman.resetEstimation', '1')
     time.sleep(0.1)
     cf.param.set_value('kalman.resetEstimation', '0')
     wait_for_position_estimator(scf)
-
 
 def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
     trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
@@ -201,7 +200,7 @@ def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
     return total_duration
 
 
-def preflight_sequence(scf: Crazyflie, trajectory: List, duration: float):
+def preflight_sequence(scf: Crazyflie, trajectory: List):
     """
     This is the preflight sequence. It calls all other subroutines before takeoff.
     """
@@ -215,15 +214,16 @@ def preflight_sequence(scf: Crazyflie, trajectory: List, duration: float):
         # ensure params are downloaded
         wait_for_param_download(scf)
 
+        # disable LED to save battery
+        cf.param.set_value('ring.effect', '0')
+
         # set pid gains
         cf.param.set_value('posCtlPid.xKp', '1')
         cf.param.set_value('posCtlPid.yKp', '1')
         cf.param.set_value('posCtlPid.zKp', '1')
 
         # check battery level
-        check_state(scf)
-
-        check_battery(scf, 4.0)
+        check_battery(scf, 3.0)
 
         # upload trajectory
         upload_trajectory(scf, trajectory_id, trajectory)
@@ -233,16 +233,16 @@ def preflight_sequence(scf: Crazyflie, trajectory: List, duration: float):
 
         # check state
         check_state(scf)
-        
+
         # print position to screen
-        #start_position_printing(scf)
+        # start_position_printing(scf)
 
     except Exception as e:
         print(e)
         raise(e)
 
 
-def go_sequence(scf: Crazyflie, trajectory: List, duration: float):
+def go_sequence(scf: Crazyflie, trajectory: List):
     """
     This is the go sequence. It commands takeoff and runs the lighting.
     """
@@ -253,9 +253,23 @@ def go_sequence(scf: Crazyflie, trajectory: List, duration: float):
     time.sleep(10.0)
     relative = False
     commander.start_trajectory(trajectory_id, 1.0, relative)
-    ## TODO
-    # For each leg of the trajectory, sleep, then change color
-    time.sleep(duration)
+    intensity = 20  # 0-255
+    import itertools
+    color_cycle = itertools.cycle([
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 0, 1]
+    ])
+    for leg in trajectory:
+        leg_duration = leg[0]
+        # wait for leg to complete
+        time.sleep(leg_duration)
+        color = color_cycle()
+        # change led color
+        cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', color[0])
+        cf.param.set_value('ring.solidBlue', color[1])
+        cf.param.set_value('ring.solidGreen', color[2])
     land_sequence(scf)
 
 
@@ -263,7 +277,9 @@ def land_sequence(scf: Crazyflie):
     cf = scf.cf  # type: Crazyflie
     commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
     commander.land(0.0, 3.0)
-    time.sleep(3)
+    print('Landing...')
+    # disable led to save battery
+    cf.param.set_value('ring.effect', '0')
     commander.stop()
 
 
@@ -281,14 +297,11 @@ def run(args):
     swarm_args = {}
     for key in trajectory_assigment.keys():
         trajectory = traj_list[str(key)]
-        duration = 0
-        for leg in trajectory:
-            duration += leg[0]
-        swarm_args[trajectory_assigment[key]] = [trajectory, duration]
+        swarm_args[trajectory_assigment[key]] = [trajectory]
 
     with Swarm(uris, factory=factory) as swarm:
         def signal_handler(sig, frame):
-            print('You pressed Ctrl+C! Landing.')
+            print('You pressed Ctrl+C!')
             swarm.parallel(land_sequence)
             sys.exit(0)
 
