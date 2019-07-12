@@ -261,21 +261,21 @@ def go_sequence(scf: Crazyflie, trajectory: List):
         time.sleep(10.0)
         relative = False
         commander.start_trajectory(trajectory_id, 1.0, relative)
-        intensity = 50  # 0-255
+        intensity = 1  # 0-1
         import itertools
-        color_cycle = itertools.cycle([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
+        color_cycle = itertools.cycle([            
+           # [0, 1, 0],
+            [255, 100, 15],
+            [0, 0, 50]
         ])
         for leg in trajectory:
             leg_duration = leg[0]
             color = next(color_cycle)
             # change led color
             red = int(intensity * color[0])
-            blue = int(intensity * color[1])
-            green = int(intensity * color[2])
-            # print('setting color', red, blue, green)
+            blue = int(intensity * color[2])
+            green = int(intensity * color[1])
+            print('setting color', red, blue, green)
             cf.param.set_value('ring.effect', '7')
             cf.param.set_value('ring.solidRed', str(red))
             cf.param.set_value('ring.solidBlue', str(blue))
