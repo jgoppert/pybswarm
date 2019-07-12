@@ -1,8 +1,11 @@
 import time
+import signal
+import sys
+import json
+import argparse
+import numpy as np
 
 import cflib.crtp
-import csv
-import json
 from cflib.crazyflie.log import LogConfig
 from cflib.crazyflie.swarm import CachedCfFactory
 from cflib.crazyflie.swarm import Swarm
@@ -12,8 +15,7 @@ from cflib.crazyflie.mem import Poly4D
 from typing import List, Dict
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie import Crazyflie
-import signal
-import sys
+
 
 # Change uris and sequences according to your setup
 DRONE0 = 'radio://0/70/2M/E7E7E7E701'
@@ -39,21 +41,21 @@ DRONE19 = 'radio://0/100/2M/E7E7E7E720'
 DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 
 # List of URIs, comment the one you do not want to fly
-#DRONE4 ## Faulty Drone // Does not work
+# DRONE4 ## Faulty Drone // Does not work
 trajectory_assigment = {
-    0: DRONE9,
-    1: DRONE2,
-    2: DRONE15,
-    3: DRONE3,
-    4: DRONE7,
-    5: DRONE14,
-    #6: DRONE7,
-    #7: DRONE17,
-    #8: DRONE18,
-    #9: DRONE10,
-    #10: DRONE11,
-    #11: DRONE12,
-    #12: DRONE13,
+    0: DRONE1,
+    # 1: DRONE2,
+    # 2: DRONE15,
+    # 3: DRONE3,
+    # 4: DRONE7,
+    # 5: DRONE14,
+    # 6: DRONE7,
+    # 7: DRONE17,
+    # 8: DRONE18,
+    # 9: DRONE10,
+    # 10: DRONE11,
+    # 11: DRONE12,
+    # 12: DRONE13,
 }
 
 
@@ -62,31 +64,67 @@ class Uploader:
         self._is_done = False
 
     def upload(self, trajectory_mem):
-        print('Uploading data')
         trajectory_mem.write_data(self._upload_done)
-
         while not self._is_done:
             time.sleep(0.2)
 
     def _upload_done(self, mem, addr):
-        print('Data uploaded')
         self._is_done = True
+
 
 def position_callback(timestamp, data, logconf):
     x = data['kalman.stateX']
     y = data['kalman.stateY']
     z = data['kalman.stateZ']
-    print('pos: ({}, {}, {})'.format(x, y, z))
+    print('Position: ({}, {}, {})'.format(x, y, z))
+
 
 def start_position_printing(scf):
     log_conf = LogConfig(name='Position', period_in_ms=500)
     log_conf.add_variable('kalman.stateX', 'float')
     log_conf.add_variable('kalman.stateY', 'float')
     log_conf.add_variable('kalman.stateZ', 'float')
-
     scf.cf.log.add_config(log_conf)
     log_conf.data_received_cb.add_callback(position_callback)
     log_conf.start()
+
+
+def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
+    log_config = LogConfig(name='Battery', period_in_ms=500)
+    log_config.add_variable('pm.vbat', 'float')
+
+    with SyncLogger(scf, log_config) as logger:
+        for log_entry in logger:
+            data = log_entry[1]
+            vbat = data['pm.vbat']
+            if data['pm.vbat'] < min_voltage:
+                msg = "battery too low: {:10.4f} V, for {:s}".format(
+                    vbat, scf.cf.link_uri)
+                raise Exception(msg)
+            else:
+                return
+
+
+def check_state(scf: SyncCrazyflie, min_voltage=4.0):
+    log_config = LogConfig(name='State', period_in_ms=500)
+    log_config.add_variable('stateEstimate.roll', 'float')
+    log_config.add_variable('stateEstimate.pitch', 'float')
+    log_config.add_variable('stateEstimate.yaw', 'float')
+
+    with SyncLogger(scf, log_config) as logger:
+        for log_entry in logger:
+            data = log_entry[1]
+            roll = data['stateEstimate.roll']
+            pitch = data['stateEstimate.pitch']
+            yaw = data['stateEstimate.yaw']
+
+            for name, val in [('roll', roll), ('pitch', pitch), ('yaw', yaw)]:
+                if np.abs(val) > np.deg2rad(20):
+                    msg = "too much {:s}, {:10.4f} deg, for {:s}".format(
+                        name, np.rad2deg(val), scf.cf.link_uri)
+                    raise Exception(msg)
+            return
+
 
 def wait_for_position_estimator(scf: SyncCrazyflie):
     print('Waiting for estimator to find position...')
@@ -102,7 +140,7 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
 
     threshold = 0.001
 
-    with SyncLogger(scf, log_config) as logger:
+    with SyncLogger(scf.cf, log_config) as logger:
         for log_entry in logger:
             data = log_entry[1]
 
@@ -120,32 +158,32 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
             min_z = min(var_z_history)
             max_z = max(var_z_history)
 
-            # print("{} {} {}".
-            #       format(max_x - min_x, max_y - min_y, max_z - min_z))
-
             if (max_x - min_x) < threshold and (
                     max_y - min_y) < threshold and (
                     max_z - min_z) < threshold:
                 break
+            else:
+                print("{} {} {}".
+                      format(max_x - min_x, max_y - min_y, max_z - min_z))
 
 
 def wait_for_param_download(scf: SyncCrazyflie):
-    print("param")
     while not scf.cf.param.is_updated:
         time.sleep(1.0)
     print('Parameters downloaded for', scf.cf.link_uri)
 
+
 def reset_estimator(scf: SyncCrazyflie):
-    print("reset")
+    print("Reset Estimator")
     cf = scf.cf
     cf.param.set_value('kalman.resetEstimation', '1')
     time.sleep(0.1)
     cf.param.set_value('kalman.resetEstimation', '0')
+    wait_for_position_estimator(scf)
 
-    wait_for_position_estimator(cf)
 
-def upload_trajectory(cf: Crazyflie, trajectory_id: int, trajectory: List):
-    trajectory_mem = cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
+def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
+    trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
 
     total_duration = 0
     for row in trajectory:
@@ -158,102 +196,117 @@ def upload_trajectory(cf: Crazyflie, trajectory_id: int, trajectory: List):
         total_duration += duration
 
     Uploader().upload(trajectory_mem)
-    cf.high_level_commander.define_trajectory(trajectory_id, 0,
-                                              len(trajectory_mem.poly4Ds))
+    scf.cf.high_level_commander.define_trajectory(trajectory_id, 0,
+                                                  len(trajectory_mem.poly4Ds))
     return total_duration
 
-def upload_sequence(scf: Crazyflie,trajectory: List, duration: float):
+
+def preflight_sequence(scf: Crazyflie, trajectory: List, duration: float):
+    """
+    This is the preflight sequence. It calls all other subroutines before takeoff.
+    """
+    cf = scf.cf  # type: Crazyflie
+
     try:
-        print("upload")
-        cf = scf.cf # type: Crazyflie
         trajectory_id = 1
-        cf.param.set_value('commander.enHighLevel','1')
-        upload_trajectory(cf, trajectory_id, trajectory)
+        # enable high level commander
+        cf.param.set_value('commander.enHighLevel', '1')
+
+        # ensure params are downloaded
+        wait_for_param_download(scf)
+
+        # set pid gains
+        cf.param.set_value('posCtlPid.xKp', '1')
+        cf.param.set_value('posCtlPid.yKp', '1')
+        cf.param.set_value('posCtlPid.zKp', '1')
+
+        # check battery level
+        check_state(scf)
+
+        check_battery(scf, 4.0)
+
+        # upload trajectory
+        upload_trajectory(scf, trajectory_id, trajectory)
+
+        # reset the estimator
         reset_estimator(scf)
+
+        # check state
+        check_state(scf)
+        
+        # print position to screen
+        #start_position_printing(scf)
+
     except Exception as e:
         print(e)
-
-def go_sequence(scf: Crazyflie,trajectory: List, duration: float):
-    try:
-        cf = scf.cf # type: Crazyflie
-        trajectory_id = 1       
-        commander = cf.high_level_commander # type: cflib.HighLevelCOmmander
-        print("go")
-        commander.takeoff(1.5, 3.0)
-        time.sleep(10.0)
-        relative = False
-        commander.start_trajectory(trajectory_id, 1.0, relative)
-        time.sleep(duration)
-    except Exception as e:
-        print(e)
-
-def land_sequence(scf: Crazyflie,trajectory: List, duration: float):
-    try:
-        cf = scf.cf # type: Crazyflie
-        commander = cf.high_level_commander # type: cflib.HighLevelCOmmander        
-        print("land")
-        commander.land(0.0, 3.0)
-        time.sleep(3)
-        commander.stop()
-    except Exception as e:
-        print(e)
+        raise(e)
 
 
+def go_sequence(scf: Crazyflie, trajectory: List, duration: float):
+    """
+    This is the go sequence. It commands takeoff and runs the lighting.
+    """
+    cf = scf.cf  # type: Crazyflie
+    trajectory_id = 1
+    commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
+    commander.takeoff(1.5, 3.0)
+    time.sleep(10.0)
+    relative = False
+    commander.start_trajectory(trajectory_id, 1.0, relative)
+    ## TODO
+    # For each leg of the trajectory, sleep, then change color
+    time.sleep(duration)
+    land_sequence(scf)
 
-if __name__ == '__main__':
+
+def land_sequence(scf: Crazyflie):
+    cf = scf.cf  # type: Crazyflie
+    commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
+    commander.land(0.0, 3.0)
+    time.sleep(3)
+    commander.stop()
+
+
+def run(args):
 
     # logging.basicConfig(level=logging.DEBUG)
     cflib.crtp.init_drivers(enable_debug_driver=False)
 
     factory = CachedCfFactory(rw_cache='./cache')
     uris = {trajectory_assigment[key] for key in trajectory_assigment.keys()}
-    print("uris:", uris)
-    with open('scripts/data/p_form.json', 'r') as f:
+    with open(args.json, 'r') as f:
         traj_list = json.load(f)
-    
-    #building arguments list in swarm
+
+    # building argumenprintts list in swarm
     swarm_args = {}
     for key in trajectory_assigment.keys():
-        print("key", key)
         trajectory = traj_list[str(key)]
-        print("trajectory assigned")
         duration = 0
-        print("duration assigned")
         for leg in trajectory:
             duration += leg[0]
         swarm_args[trajectory_assigment[key]] = [trajectory, duration]
-        print("trajectory URI:", trajectory_assigment[key])
-        print("duration:", duration)
-                
-
 
     with Swarm(uris, factory=factory) as swarm:
         def signal_handler(sig, frame):
-            print('You pressed Ctrl+C!')
-            swarm.parallel(land_sequence, args_dict=swarm_args)
+            print('You pressed Ctrl+C! Landing.')
+            swarm.parallel(land_sequence)
             sys.exit(0)
+
         signal.signal(signal.SIGINT, signal_handler)
-        print('Press Ctrl+C')
-    
-        # If the copters are started in their correct positions this is
-        # probably not needed. The Kalman filter will have time to converge
-        # any way since it takes a while to start them all up and connect. We
-        # keep the code here to illustrate how to do it.
-        print('Resetting estimators...')
-        #swarm.parallel(reset_estimator)
+        print('Press Ctrl+C to land.')
+        swarm.parallel_safe(preflight_sequence, args_dict=swarm_args)
+        swarm.parallel_safe(go_sequence, args_dict=swarm_args)
 
-        # The current values of all parameters are downloaded as a part of the
-        # connections sequence. Since we have 10 copters this is clogging up
-        # communication and we have to wait for it to finish before we start
-        # flying.
-        print('Waiting for parameters to be downloaded...')
-        swarm.parallel(wait_for_param_download)
 
-        #print('Setting up trajectories...')
-        #swarm.parallel(setup_trajectory, args_dict = swarm_args)
-
-        print('Running trajectory...')
-        swarm.parallel(upload_sequence, args_dict=swarm_args)
-        swarm.parallel(start_position_printing, args_dict = swarm_args)
-        swarm.parallel(go_sequence, args_dict=swarm_args)
-        swarm.parallel(land_sequence, args_dict=swarm_args)
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('json')
+    parser.add_argument('--trace', action='store_true')
+    args = parser.parse_args()
+    if args.trace:
+        run(args)
+    else:
+        try:
+            run(args)
+        except Exception as e:
+            print(e)
