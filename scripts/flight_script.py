@@ -43,9 +43,9 @@ DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 # List of URIs, comment the one you do not want to fly
 # DRONE4 ## Faulty Drone // Does not work
 trajectory_assigment = {
-    0: DRONE6,
-    # 1: DRONE2,
-    # 2: DRONE15,
+    0: DRONE7,
+    1: DRONE1,
+    #2: DRONE6,
     # 3: DRONE3,
     # 4: DRONE7,
     # 5: DRONE14,
@@ -109,16 +109,16 @@ def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
 def check_state(scf: SyncCrazyflie, min_voltage=4.0):
     print('Checking state.')
     log_config = LogConfig(name='State', period_in_ms=500)
-    log_config.add_variable('stateEstimate.roll', 'float')
-    log_config.add_variable('stateEstimate.pitch', 'float')
-    log_config.add_variable('stateEstimate.yaw', 'float')
+    log_config.add_variable('stabilizer.roll', 'float')
+    log_config.add_variable('stabilizer.pitch', 'float')
+    log_config.add_variable('stabilizer.yaw', 'float')
 
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
             data = log_entry[1]
-            roll = data['stateEstimate.roll']
-            pitch = data['stateEstimate.pitch']
-            yaw = data['stateEstimate.yaw']
+            roll = data['stabilizer.roll']
+            pitch = data['stabilizer.pitch']
+            yaw = data['stabilizer.yaw']
 
             for name, val in [('roll', roll), ('pitch', pitch), ('yaw', yaw)]:
                 if np.abs(val) > 20:
@@ -216,15 +216,17 @@ def preflight_sequence(scf: Crazyflie, trajectory: List):
 
         # ensure params are downloaded
         wait_for_param_download(scf)
+
+        # make sure not already flying
         land_sequence(scf)
 
         # disable LED to save battery
         cf.param.set_value('ring.effect', '0')
 
         # set pid gains
-        cf.param.set_value('posCtlPid.xKp', '2')
-        cf.param.set_value('posCtlPid.yKp', '2')
-        cf.param.set_value('posCtlPid.zKp', '2')
+        cf.param.set_value('posCtlPid.xKp', '1')
+        cf.param.set_value('posCtlPid.yKp', '1')
+        cf.param.set_value('posCtlPid.zKp', '1')
 
         # check battery level
         check_battery(scf, 4.0)
@@ -243,6 +245,7 @@ def preflight_sequence(scf: Crazyflie, trajectory: List):
 
     except Exception as e:
         print(e)
+        land_sequence(scf)
         raise(e)
 
 
@@ -272,13 +275,13 @@ def go_sequence(scf: Crazyflie, trajectory: List):
             red = int(intensity * color[0])
             blue = int(intensity * color[1])
             green = int(intensity * color[2])
-            print('setting color', red, blue, green)
+            # print('setting color', red, blue, green)
             cf.param.set_value('ring.effect', '7')
             cf.param.set_value('ring.solidRed', str(red))
             cf.param.set_value('ring.solidBlue', str(blue))
             cf.param.set_value('ring.solidGreen', str(green))
             # wait for leg to complete
-            print('sleeping leg duration', leg_duration)
+            # print('sleeping leg duration', leg_duration)
             time.sleep(leg_duration)
 
         land_sequence(scf)
