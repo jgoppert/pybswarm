@@ -267,9 +267,9 @@ def go_sequence(scf: Crazyflie, trajectory: List):
         color = next(color_cycle)
         # change led color
         cf.param.set_value('ring.effect', '7')
-        cf.param.set_value('ring.solidRed', color[0])
-        cf.param.set_value('ring.solidBlue', color[1])
-        cf.param.set_value('ring.solidGreen', color[2])
+        cf.param.set_value('ring.solidRed', intensity*color[0])
+        cf.param.set_value('ring.solidBlue', intensity*color[1])
+        cf.param.set_value('ring.solidGreen', intensity*color[2])
     land_sequence(scf)
 
 
