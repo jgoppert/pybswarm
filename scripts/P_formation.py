@@ -79,12 +79,50 @@ form0 = scale_formation(np.array([
 plot_formation(form0, '0')
 
 
+#%% A
+formA = scale_formation(np.array([
+    [-0.5, 0, 1],
+    [0, 0.5, 0.5],
+    [0, 0, 0.5],
+    [0, -0.5, 0.5],
+    [0.5, -0.5, 0],
+    [0.5, 0.5, 0],
+]).T, letter_scale)
+plot_formation(formA, 'A')
+
+#%% L
+formL = scale_formation(np.array([
+    [-0.5, -0.5, 1],
+    [0, -0.5, 0.5],
+    [0, 0.5, 0.5],
+    [0.5, -0.5, 0],
+    [0.5, 0, 0],
+    [0.5, 0.5, 0],
+]).T, letter_scale)
+plot_formation(formL, 'L')
+
+#%% 1
+form1 = scale_formation(np.array([
+    [-0.5, -0.5, 1],
+    [-0.5, 0, 1],
+    [0, 0, 0.5],
+    [0.5, -0.5, 0],
+    [0.5, 0, 0],
+    [0.5, 0.5, 0],
+]).T, letter_scale)
+plot_formation(form1, '1')
+
+
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
 waypoints = np.array([
     formTakeoff, formTakeoff,
     formP, formP,
     formU, formU,
-    form5, form5,
+    formA, formA,
+    formP, formP,
+    form0, form0,
+    formL, formL,
+    formL, formL,
     form0, form0,
     formTakeoff, formTakeoff])
 
@@ -104,9 +142,9 @@ dist_max
 trajectories = []
 
 #T = 3*np.ones(len(dist_max))
-T = 10*np.ones(len(dist_max))
+T = 5*np.ones(len(dist_max))
 
-origin = np.array([1.5, 2, 2])
+origin = np.array([1.5, 2, 1.5])
 
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
@@ -124,8 +162,3 @@ plt.show()
 for traj in trajectories:
     tgen.plot_trajectory_derivatives(traj)
     print('T', T)
-
-#%%
-
-
-#%%
