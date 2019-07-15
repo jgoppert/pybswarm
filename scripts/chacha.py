@@ -81,7 +81,7 @@ trajectories = []
 #T = 3*np.ones(len(dist_max))
 T = 1*np.ones(len(dist_max))
 
-origin = np.array([1.5, 2, 2])
+origin = np.array([1.5, 2, 1.5])
 
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
