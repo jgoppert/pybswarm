@@ -47,7 +47,6 @@ class Trajectory1D:
         coef_div = np.array([scale**k for k in range(n)])
         P_scaled = [Polynomial(Pi.coef/coef_div) for Pi in self.P]
         T_scaled = (np.array(self.T)*scale).tolist()
-        print('T_scaled', T_scaled)
         return Trajectory1D(T_scaled, P_scaled)
 
     def coef_array(self) -> np.array:
@@ -257,6 +256,7 @@ def min_snap_1d(waypoints: List[List[float]], T: List[float], stop: bool=True) -
                     b[eq] = 0
                     eq += 1
 
+    assert eq == n*legs
     if eq != n*legs:
         print('warning: equations: {:d}, coefficients: {:d}'.format(eq, n*legs))
     c = np.linalg.pinv(A).dot(b)

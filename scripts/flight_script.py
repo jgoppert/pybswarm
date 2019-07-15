@@ -257,7 +257,7 @@ def go_sequence(scf: Crazyflie, trajectory: List):
         cf = scf.cf  # type: Crazyflie
         trajectory_id = 1
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
-        commander.takeoff(1.5, 3.0)
+        commander.takeoff(2, 3.0)
         time.sleep(10.0)
         relative = False
         commander.start_trajectory(trajectory_id, 1.0, relative)
@@ -265,6 +265,7 @@ def go_sequence(scf: Crazyflie, trajectory: List):
         import itertools
         color_cycle = itertools.cycle([            
            # [0, 1, 0],
+            [0, 0, 50],
             [255, 100, 15],
             [0, 0, 50]
         ])
