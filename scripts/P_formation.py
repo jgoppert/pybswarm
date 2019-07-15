@@ -81,11 +81,11 @@ plot_formation(form0, '0')
 
 #%% A
 formA = scale_formation(np.array([
+    [0, -0.5, 0.5],
     [-0.5, 0, 1],
     [0, 0.5, 0.5],
-    [0, 0, 0.5],
-    [0, -0.5, 0.5],
     [0.5, -0.5, 0],
+    [0, 0, 0.5],
     [0.5, 0.5, 0],
 ]).T, letter_scale)
 plot_formation(formA, 'A')
@@ -116,15 +116,15 @@ plot_formation(form1, '1')
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
 waypoints = np.array([
     formTakeoff, formTakeoff,  formTakeoff,
-    formP, formP, formTakeoff,
-    formU, formU, formTakeoff,
-    formA, formA, formTakeoff,
-    formP, formP, formTakeoff,
-    form0, form0, formTakeoff,
-    formL, formL, formTakeoff,
-    formL, formL, formTakeoff,
-    form0, form0, formTakeoff,
-     formTakeoff, formTakeoff, formTakeoff])
+    formTakeoff, formP, formP,
+    formTakeoff, formU, formU,
+    formTakeoff, formA, formA,
+    formTakeoff, formP, formP,
+    formTakeoff, form0, form0,
+    formTakeoff, formL, formL,
+    formTakeoff, formL, formL,
+    formTakeoff, form0, form0,
+    formTakeoff, formTakeoff, formTakeoff])
 
 plt.figure()
 ax = plt.axes(projection='3d')
@@ -150,7 +150,7 @@ for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
     yaw_wp = np.zeros((pos_wp.shape[0], 1))
     traj = tgen.min_snap_4d(
-        np.hstack([pos_wp, yaw_wp]), T, stop=False)
+        np.hstack([pos_wp, yaw_wp]), T, stop=True)
     trajectories.append(traj)
 
 tgen.plot_trajectories_3d(trajectories)
