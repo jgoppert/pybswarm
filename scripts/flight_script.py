@@ -46,12 +46,12 @@ DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 # List of URIs, comment the one you do not want to fly
 # DRONE4 ## Faulty Drone // Does not work
 trajectory_assigment = {
-    0: DRONE2,
-    1: DRONE9,
-    2: DRONE6,
-    3: DRONE15,
-    4: DRONE19,
-    5: DRONE0,
+    0: DRONE15,
+    1: DRONE19,
+    2: DRONE2,
+    3: DRONE9,
+    #4: DRONE5,
+    #5: DRONE12,
     # 6: DRONE7,
     # 7: DRONE17,
     # 8: DRONE18,
@@ -61,18 +61,22 @@ trajectory_assigment = {
     # 12: DRONE13,
 }
 
-
 class Uploader:
-    def __init__(self):
+    def __init__(self, trajectory_mem):
         self._is_done = False
+        self.trajectory_mem = trajectory_mem
 
-    def upload(self, trajectory_mem):
-        trajectory_mem.write_data(self._upload_done)
+    def upload(self):
+        print('upload started')
+        self.trajectory_mem.write_data(self._upload_done)
         while not self._is_done:
+            print('upload sleeping')
             time.sleep(0.2)
 
     def _upload_done(self, mem, addr):
+        print('upload is done')
         self._is_done = True
+        self.trajectory_mem.disconnect()
 
 
 def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
@@ -98,6 +102,7 @@ def check_state(scf: SyncCrazyflie, min_voltage=4.0):
     log_config.add_variable('stabilizer.roll', 'float')
     log_config.add_variable('stabilizer.pitch', 'float')
     log_config.add_variable('stabilizer.yaw', 'float')
+    print('Log configured.')
 
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
@@ -105,12 +110,17 @@ def check_state(scf: SyncCrazyflie, min_voltage=4.0):
             roll = data['stabilizer.roll']
             pitch = data['stabilizer.pitch']
             yaw = data['stabilizer.yaw']
+            print('Checking roll/pitch/yaw.')
 
             for name, val in [('roll', roll), ('pitch', pitch), ('yaw', yaw)]:
+
                 if np.abs(val) > 20:
+                    print('exceeded')
                     msg = "too much {:s}, {:10.4f} deg, for {:s}".format(
                         name, val, scf.cf.link_uri)
+                    print(msg)
                     raise Exception(msg)
+            print('returning from checking state')
             return
 
 
@@ -170,25 +180,34 @@ def reset_estimator(scf: SyncCrazyflie):
     wait_for_position_estimator(scf)
 
 
-def upload_trajectory(scf: SyncCrazyflie, trajectory: List):
-    trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
+def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
+    try:
+        cf = scf.cf  # type: Crazyflie
 
-    total_duration = 0
-    for row in trajectory:
-        duration = row[0]
-        x = Poly4D.Poly(row[1:9])
-        y = Poly4D.Poly(row[9:17])
-        z = Poly4D.Poly(row[17:25])
-        yaw = Poly4D.Poly(row[25:33])
-        trajectory_mem.poly4Ds.append(Poly4D(duration, x, y, z, yaw))
-        total_duration += duration
+        print('Starting upload')
+        trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
+        for row in trajectory:
+            duration = row[0]
+            x = Poly4D.Poly(row[1:9])
+            y = Poly4D.Poly(row[9:17])
+            z = Poly4D.Poly(row[17:25])
+            yaw = Poly4D.Poly(row[25:33])
+            trajectory_mem.poly4Ds.append(Poly4D(duration, x, y, z, yaw))
 
-    Uploader().upload(trajectory_mem)
-    cf = scf.cf  # type: Crazyflie
-    cf.high_level_commander.define_trajectory(
-        trajectory_id=1, offset=0, n_pieces=len(trajectory_mem.poly4Ds))
-    return total_duration
+        print('Calling upload method')
+        def callback(mem, addr):
+            print('upload done')
+        trajectory_mem.write_data(callback)
+        time.sleep(5)
+        
+        print('Defining trajectory.')
+        cf.high_level_commander.define_trajectory(
+            trajectory_id=trajectory_id, offset=0, n_pieces=len(trajectory_mem.poly4Ds))
 
+    except Exception as e:
+        print(e)
+        land_sequence(scf)
+        raise(e)
 
 def preflight_sequence(scf: Crazyflie):
     """
@@ -197,7 +216,6 @@ def preflight_sequence(scf: Crazyflie):
     cf = scf.cf  # type: Crazyflie
 
     try:
-        trajectory_id = 1
         # enable high level commander
         cf.param.set_value('commander.enHighLevel', '1')
 
@@ -230,25 +248,51 @@ def preflight_sequence(scf: Crazyflie):
         raise(e)
 
 
-def go_sequence(scf: Crazyflie, trajectory: List):
+def takeoff_sequence(scf: Crazyflie):
     """
-    This is the go sequence. It commands takeoff and runs the lighting.
+    This is the takeoff sequence. It commands takeoff.
     """
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
+        cf.param.set_value('commander.enHighLevel', '1')
+        cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', str(0))
+        cf.param.set_value('ring.solidGreen', str(0))
+        cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(2, 3.0)
         time.sleep(10.0)
+    except Exception as e:
+        print(e)
+        land_sequence(scf)
+
+
+def go_sequence(scf: Crazyflie, trajectory_id: int, trajectory: List):
+    """
+    This is the go sequence. It commands the trajectory to start and runs the lighting.
+    """
+    try:
+        cf = scf.cf  # type: Crazyflie
+        commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.start_trajectory(
-            trajectory_id=1, time_scale=1.0, relative=False)
+            trajectory_id=trajectory_id, time_scale=1.0, relative=False)
         intensity = 1  # 0-1
         import itertools
+
+        # initial led color
+        cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', str(0))
+        cf.param.set_value('ring.solidGreen', str(255))
+        cf.param.set_value('ring.solidBlue', str(0))
+        time.sleep(1)
+
         color_cycle = itertools.cycle([
             # [0, 1, 0],
             [0, 0, 50],
             [255, 100, 15],
             [0, 0, 50]
         ])
+
         for leg in trajectory:
             leg_duration = leg[0]
             color = next(color_cycle)
@@ -271,14 +315,17 @@ def go_sequence(scf: Crazyflie, trajectory: List):
 
 
 def land_sequence(scf: Crazyflie):
-    cf = scf.cf  # type: Crazyflie
-    commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
-    commander.land(0.0, 3.0)
-    print('Landing...')
-    time.sleep(3)
-    # disable led to save battery
-    commander.stop()
-
+    try:
+        cf = scf.cf  # type: Crazyflie
+        commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
+        commander.land(0.0, 3.0)
+        print('Landing...')
+        time.sleep(3)
+        # disable led to save battery
+        commander.stop()
+    except Exception as e:
+        print(e)
+        land_sequence(scf)
 
 def run(args):
 
@@ -291,11 +338,11 @@ def run(args):
         traj_list = json.load(f)
 
     # building argumenprintts list in swarm
-    def swarm_args(start, stop):
+    def swarm_args(traj_id, start, stop):
         res = {}
         for key in trajectory_assigment.keys():
             trajectory = traj_list[str(key)]
-            res[trajectory_assigment[key]] = [trajectory[start:stop]]
+            res[trajectory_assigment[key]] = [traj_id, trajectory[start:stop]]
         return res
 
     with Swarm(uris, factory=factory) as swarm:
@@ -308,18 +355,27 @@ def run(args):
         print('Press Ctrl+C to land.')
 
         TRAJECTORY_MAX_LENGTH = 31
+        print('Preflight sequence...')
         swarm.parallel_safe(preflight_sequence)
 
+        #print('Takeoff sequence...')
+        swarm.parallel_safe(takeoff_sequence)
+
+        print('Upload sequence...')
         trajectory_count = 0
-        n_legs = len(traj_list[0])
+        n_legs = len(traj_list[[k for k in traj_list.keys()][0]])
         while trajectory_count * TRAJECTORY_MAX_LENGTH < n_legs:
-            args = swarm_args(
-                TRAJECTORY_MAX_LENGTH * trajectory_count,
-                TRAJECTORY_MAX_LENGTH * (trajectory_count + 1))
-            print('Uploading Trajectory', trajectory_count, '...')
-            swarm.parallel_safe(upload_trajectory, args_dict=args)
+            trajectory_id = trajectory_count + 1
+            args = swarm_args(1, 0, TRAJECTORY_MAX_LENGTH)
+            if trajectory_count == 0:
+                print('Uploading Trajectory', trajectory_id, '...')
+                swarm.parallel(upload_trajectory, args_dict=args)
+
+            print('Go...')
             swarm.parallel_safe(go_sequence, args_dict=args)
             trajectory_count += 1
+        
+        print('Land sequence...')
         swarm.parallel(land_sequence)
 
 
@@ -334,4 +390,4 @@ if __name__ == "__main__":
         try:
             run(args)
         except Exception as e:
-            print(e)
+            print('exception', e)

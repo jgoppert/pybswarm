@@ -121,8 +121,8 @@ waypoints = []
 for letter in 'P U A P O L L O'.split(' '):
     form = formLetter[letter]
     waypoints.extend([formTakeoff, form, form])
-    for theta in np.linspace(0, 2*np.pi, 6)[1:]:
-        waypoints.append(formation.rotate_points_z(form, theta))
+    #for theta in np.linspace(0, 2*np.pi, 6)[1:]:
+    #    waypoints.append(formation.rotate_points_z(form, theta))
 waypoints.extend([formTakeoff, formTakeoff, formTakeoff])
 waypoints = np.array(waypoints)
 
