@@ -187,7 +187,7 @@ class Trajectory4D:
                    delimiter=',', fmt='%15g', header=header)
 
 
-def min_deriv_1d(deriv: int, waypoints: List[List[float]], T: List[float], stop: bool = True) -> Trajectory1D:
+def min_deriv_1d(deriv: int, waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory1D:
     n = deriv * 2  # number of poly coeff (order + 1)
     S = np.hstack([0, np.cumsum(T)])
     legs = len(T)
@@ -265,7 +265,7 @@ def min_deriv_1d(deriv: int, waypoints: List[List[float]], T: List[float], stop:
     return Trajectory1D(T, P_list)
 
 
-def min_deriv_4d(deriv: int, waypoints: List[List[float]], T: List[float], stop: bool = False) -> Trajectory4D:
+def min_deriv_4d(deriv: int, waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory4D:
     traj_x = min_deriv_1d(deriv, waypoints[:, 0], T, stop)
     traj_y = min_deriv_1d(deriv, waypoints[:, 1], T, stop)
     traj_z = min_deriv_1d(deriv, waypoints[:, 2], T, stop)
@@ -273,19 +273,19 @@ def min_deriv_4d(deriv: int, waypoints: List[List[float]], T: List[float], stop:
     return Trajectory4D(traj_x, traj_y, traj_z, traj_yaw)
 
 
-def min_snap_1d(waypoints: List[List[float]], T: List[float], stop: bool = True) -> Trajectory1D:
+def min_snap_1d(waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory1D:
     return min_deriv_1d(4, waypoints, T, stop)
 
 
-def min_snap_4d(waypoints: List[List[float]], T: List[float], stop: bool = False) -> Trajectory4D:
+def min_snap_4d(waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory4D:
     return min_deriv_4d(4, waypoints, T, stop)
 
 
-def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool = True) -> Trajectory1D:
+def min_accel_1d(waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory1D:
     return min_deriv_1d(2, waypoints, T, stop)
 
 
-def min_accel_4d(waypoints: List[List[float]], T: List[float], stop: bool = False) -> Trajectory4D:
+def min_accel_4d(waypoints: List[List[float]], T: List[float], stop: bool) -> Trajectory4D:
     return min_deriv_4d(2, waypoints, T, stop)
 
 
