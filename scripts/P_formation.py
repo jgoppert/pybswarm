@@ -119,7 +119,10 @@ plot_formation(formLetter['1'], '1')
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
 waypoints = []
 for letter in 'P U A P O L L O'.split(' '):
-    waypoints.extend([formTakeoff, formLetter[letter], formLetter[letter]])
+    form = formLetter[letter]
+    waypoints.extend([formTakeoff, form, form])
+    for theta in np.linspace(0, 2*np.pi, 6)[1:]:
+        waypoints.append(formation.rotate_points_z(form, theta))
 waypoints.extend([formTakeoff, formTakeoff, formTakeoff])
 waypoints = np.array(waypoints)
 
@@ -140,7 +143,7 @@ wait_time = 5
 origin = np.array([1.5, 2, 2])
 
 trajectories = []
-T = 2*dist_max
+T = dist_max*2
 T = np.where(T == 0, wait_time, T)
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
@@ -149,24 +152,23 @@ for drone in range(waypoints.shape[2]):
         np.hstack([pos_wp, yaw_wp]), T, stop=False)
     trajectories.append(traj)
 
-#tgen.plot_trajectories(trajectories)
+tgen.plot_trajectories(trajectories)
 plt.show()
 
 tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
 
 #%%
 plt.figure()
-tgen.plot_trajectories_derivatives(trajectories)
+tgen.plot_trajectories_time_history(trajectories)
 plt.show()
 
 #%%
 plt.figure()
-tgen.plot_trajectories_derivative_magnitudes(trajectories)
+tgen.plot_trajectories_magnitudes(trajectories)
 plt.show()
 
 #%%
-assert len(traj.coef_array()) < 31
-print('number of segments', len(traj.coef_array()), 'must be less than 31')
+print('number of segments', len(traj.coef_array()))
 #%%
 plt.figure()
 plt.title('durations')
