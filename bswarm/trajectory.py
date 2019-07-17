@@ -28,7 +28,9 @@ import dataclasses
 import json
 from numpy.polynomial import Polynomial
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
+import mpl_toolkits.mplot3d.axes3d as p3
+import matplotlib.animation as animation
+
 from typing import List
 
 
@@ -62,7 +64,7 @@ class Trajectory1D:
         S = np.hstack([0, np.cumsum(self.T)])
         legs = len(self.T)
         for leg, Pi in enumerate(self.P):
-            gamma = np.linspace(0, self.T[leg], 1000)
+            gamma = np.arange(0, self.T[leg], 0.1)
             t_list.append(gamma + S[leg])
             y_list.append(Pi(gamma))
         return np.hstack(t_list), np.hstack(y_list)
@@ -221,21 +223,21 @@ def min_deriv_1d(deriv: int, waypoints: List[List[float]], T: List[float], stop:
         else:
             for m in range(n // 2 - 1):
                 if m == 0:
-                    A[eq, n * leg:n
-                        * (leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                    A[eq, n * leg:n *
+                        (leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
                     b[eq] = waypoints[leg]
                     eq += 1
                 elif stop:
-                    A[eq, n * leg:n
-                        * (leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
+                    A[eq, n * leg:n *
+                        (leg + 1)] = coef_weights(t=S[leg], m=m, t0=S[leg])
                     b[eq] = 0
                     eq += 1
 
         # last waypoint only
         if leg == legs - 1:
             for m in range(n // 2):
-                A[eq, n * leg:n
-                    * (leg + 1)] = coef_weights(t=S[leg + 1], m=m, t0=S[leg])
+                A[eq, n * leg:n *
+                    (leg + 1)] = coef_weights(t=S[leg + 1], m=m, t0=S[leg])
                 if m == 0:
                     b[eq] = waypoints[leg + 1]
                 else:
@@ -287,76 +289,97 @@ def min_accel_4d(waypoints: List[List[float]], T: List[float], stop: bool = Fals
     return min_deriv_4d(2, waypoints, T, stop)
 
 
-def plot_trajectory_derivatives(traj) -> None:
-    names = ['pos', 'vel',
-             'acc', 'jerk', 'snap']
+def plot_trajectories_time_history(trajectories: List[Trajectory4D]) -> None:
+    names = ['pos', 'vel', 'acc', 'jerk', 'snap']
     for i, name in enumerate(names):
         plt.subplot(len(names), 1, i + 1)
-        plt.plot(*traj.derivative(i).eval())
+        for traj in trajectories:
+            plt.plot(*traj.derivative(i + 1).eval())
         plt.xlabel('t, sec')
         plt.grid()
         plt.ylabel(name)
 
 
-def plot_trajectory_derivative_magnitudes(traj) -> None:
-    names = ['vel',
-             'acc', 'jerk', 'snap']
-    for m, name in enumerate(names):
-        plt.subplot(4, 1, m + 1)
-        t, a = traj.derivative(m).eval()
-        plt.plot(t, np.linalg.norm(a, axis=1))
+def plot_trajectories_magnitudes(trajectories: List[Trajectory4D]) -> None:
+    names = ['pos', 'vel', 'acc', 'jerk', 'snap']
+    for i, name in enumerate(names):
+        plt.subplot(len(names), 1, i + 1)
+        for traj in trajectories:
+            t, a = traj.derivative(i).eval()
+            plt.plot(t, np.linalg.norm(a, axis=1))
         plt.xlabel('t, sec')
         plt.ylabel(name)
 
 
-def plot_trajectory_3d(traj) -> None:
-    ax = plt.gca(projection='3d')
-    t, p = traj.eval()
-    ax.plot(p[:, 0], p[:, 1], p[:, 2])
-    ax.set_xlabel('x, m')
-    ax.set_ylabel('y, m')
-    ax.set_zlabel('z, m')
-    box_size = np.max(np.max(p[:, :3], axis=0) - np.min(p[:, :3], axis=0)) / 2
-    decimals = 1
-    ax.set_xlim(
-        np.round(np.mean(p[:, 0]) - box_size, decimals),
-        np.round(np.mean(p[:, 0]) + box_size, decimals))
-    ax.set_ylim(
-        np.round(np.mean(p[:, 1]) - box_size, decimals),
-        np.round(np.mean(p[:, 1]) + box_size, decimals))
-    ax.set_zlim(
-        np.round(np.mean(p[:, 2]) - box_size, decimals),
-        np.round(np.mean(p[:, 2]) + box_size, decimals))
-
-
-def plot_trajectories_3d(trajectories) -> None:
-    t, p = trajectories[0].eval()
-    p_list = []
+def plot_trajectories(trajectories: List[Trajectory4D]) -> None:
+    dataLines = []
     for traj in trajectories:
-        p_list.append(traj.eval()[1])
-    p_list = np.array(p_list)
+        x = traj.eval()[1]
+        dataLines.append(x.T)
 
-    ax = plt.gca(projection='3d')
-    for p in p_list:
-        ax.plot3D(p[:, 0], p[:, 1], p[:, 2])
+    fig = plt.gcf()
+    ax = p3.Axes3D(fig)
     ax.set_xlabel('x, m')
     ax.set_ylabel('y, m')
     ax.set_zlabel('z, m')
-    box_size = np.max(
-        np.max(p_list, axis=1) - np.min(p_list, axis=1)) / 2
-    center = (np.max(np.max(p_list, axis=1), axis=0)
-              + np.min(np.min(p_list, axis=1), axis=0   ))/2
-    decimals = 1
+    border = 0.1
+    all_x = np.array([dat[0, :] for dat in dataLines])
+    ax.set_xlim3d(np.floor(np.min(all_x) - border),
+                  np.ceil(np.max(all_x) + border))
+    all_y = np.array([dat[1, :] for dat in dataLines])
+    ax.set_ylim3d(np.floor(np.min(all_y) - border),
+                  np.ceil(np.max(all_y) + border))
+    all_z = np.array([dat[2, :] for dat in dataLines])
+    ax.set_zlim3d(np.floor(np.min(all_z) - border),
+                  np.ceil(np.max(all_z) + border))
+    lines = [ax.plot(dat[0, :], dat[1, :], dat[2, :])[0] for dat in dataLines]
 
-    ax.set_xlim(
-        np.round(center[0] - box_size, decimals),
-        np.round(center[0] + box_size, decimals))
-    ax.set_ylim(
-        np.round(center[1] - box_size, decimals),
-        np.round(center[1] + box_size, decimals))
-    ax.set_zlim(
-        np.round(center[2] - box_size, decimals),
-        np.round(center[2] + box_size, decimals))
+def animate_trajectories(filename, trajectories, fps):
+    # Attaching 3D axis to the figure
+    fig = plt.figure(figsize=(10, 10))
+    ax = p3.Axes3D(fig)
+    ax.set_xlabel('x, m')
+    ax.set_ylabel('y, m')
+    ax.set_zlabel('z, m')
+
+    # create trajectory data
+    dataLines = []
+    for traj in trajectories:
+        x = traj.eval()[1]
+        dataLines.append(x.T)
+    lines = [ax.plot([dat[0, 0]], [dat[1, 0]], [dat[2, 0]],
+                     'ro', markersize=10)[0] for dat in dataLines]
+
+    fps = 5  # frames per second
+    data_period = 0.1  # data period, seconds
+    data_length = dataLines[0].shape[1]
+    duration = data_period * data_length
+    frames = int(np.floor(duration * fps))
+    step = data_length // frames
+
+    def update_lines(num, dataLines, lines):
+        for line, data in zip(lines, dataLines):
+            # NOTE: there is no .set_data() for 3 dim data...
+            line.set_data(data[0:2, num * step])
+            line.set_3d_properties(data[2, num * step])
+        return lines
+
+    border = 0.1
+    all_x = np.array([dat[0, :] for dat in dataLines])
+    ax.set_xlim3d(np.floor(np.min(all_x) - border),
+                  np.ceil(np.max(all_x) + border))
+    all_y = np.array([dat[1, :] for dat in dataLines])
+    ax.set_ylim3d(np.floor(np.min(all_y) - border),
+                  np.ceil(np.max(all_y) + border))
+    all_z = np.array([dat[2, :] for dat in dataLines])
+    ax.set_zlim3d(np.floor(np.min(all_z) - border),
+                  np.ceil(np.max(all_z) + border))
+
+    ani = animation.FuncAnimation(
+        fig, update_lines, frames, fargs=(dataLines, lines),
+        interval=int(1000 / fps), blit=False)
+    ani.save(filename)
+    plt.close()
 
 
 def trajectories_to_json(trajectories: List[Trajectory4D], filename: str):

@@ -5,6 +5,8 @@ sys.path.insert(0, os.getcwd())
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation
+
 import numpy as np
 import bswarm.trajectory as tgen
 import bswarm.formation as formation
@@ -147,19 +149,20 @@ for drone in range(waypoints.shape[2]):
         np.hstack([pos_wp, yaw_wp]), T, stop=False)
     trajectories.append(traj)
 
-tgen.plot_trajectories_3d(trajectories)
-tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
+#tgen.plot_trajectories(trajectories)
 plt.show()
 
-#%%
-for traj in trajectories:
-    tgen.plot_trajectory_derivatives(traj)
+tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
 
 #%%
 plt.figure()
-for m in range(4):
-    for traj in trajectories:
-        tgen.plot_trajectory_derivative_magnitudes(traj)
+tgen.plot_trajectories_derivatives(trajectories)
+plt.show()
+
+#%%
+plt.figure()
+tgen.plot_trajectories_derivative_magnitudes(trajectories)
+plt.show()
 
 #%%
 assert len(traj.coef_array()) < 31
@@ -168,5 +171,9 @@ print('number of segments', len(traj.coef_array()), 'must be less than 31')
 plt.figure()
 plt.title('durations')
 plt.bar(range(len(T)), T)
+plt.show()
+
+#%%
+tgen.animate_trajectories('p_formation.mp4', trajectories, 1)
 
 #%%

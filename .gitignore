@@ -2,6 +2,7 @@
 cache/
 build/
 dist/
+*.mp4
 *.egg-info/
 *.egg
 *.eggs
