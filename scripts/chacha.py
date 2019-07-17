@@ -1,15 +1,15 @@
-#%%
+# %%
+import json
+import bswarm
+import bswarm.formation as formation
+import bswarm.trajectory as tgen
+import numpy as np
+import matplotlib.pyplot as plt
+from mpl_toolkits import mplot3d
 import sys
 import os
 sys.path.insert(0, os.getcwd())
 
-from mpl_toolkits import mplot3d
-import matplotlib.pyplot as plt
-import numpy as np
-import bswarm.trajectory as tgen
-import bswarm.formation as form
-import bswarm
-import json
 
 def plot_formation(F, name):
     plt.figure()
@@ -18,13 +18,15 @@ def plot_formation(F, name):
     plt.title(name)
     plt.show()
 
+
 def scale_formation(form, scale):
     formNew = np.copy(form)
     for i in range(3):
         formNew[i, :] *= scale[i]
     return formNew
 
-#%% takeoff
+
+# %% takeoff
 formTakeoff = np.array([
     [-0.5, -1, 0],
     [-0.5, 0, 0],
@@ -32,134 +34,142 @@ formTakeoff = np.array([
     [0.5, -1, 0],
 ]).T
 plot_formation(formTakeoff, 'takeoff')
-#%% Square
-letter_scale = np.array([1.5, 1.5, 1.5])
+# %% Square
+form_scale = np.array([1.5, 1.5, 1.5])
 form = scale_formation(np.array([
     [0.5, -0.5, 0],
     [-0.5, -0.5, 0],
     [-0.5, 0.5, 0],
     [0.5, 0.5, 0]
-]).T, letter_scale)
+]).T, form_scale)
 plot_formation(form, 'formation')
 
-left = np.array([[0, -0.5, 0]]).T
-right = np.array([[0, 0.5, 0]]).T
-front = np.array([[-0.5, 0, 0]]).T
-back = np.array([[0.5, 0, 0]]).T
-hop = np.array([[0, 0, 1]]).T
-down = np.array([[0, 0, 1]]).T
+waypoints = []
+
+
+def left(T):
+    waypoints.append()
+
 
 class ChaCha():
 
-    def __init__(self, origin):
-        self.origin = origin
-        self.pos = np.array([[0, 0, 0]]).T
-        self.traj_list[]
+    def __init__(self):
+        self.waypoints = [form]
+        self.T = []
 
-    def chacha(self, T):
-        self.pos = np.array([[0, 0, 0]]).T
-        self.plan()
+    def wait(self, duration):
+        self.waypoints.append(form)
+        self.T.append(duration)
 
-    def left(self, T):
-        self.pos = self.pos + np.array([[0, -0.5, 0]]).T
+    def move(self, duration, vector):
+        self.waypoints.append(form + vector)
+        self.T.append(duration / 2)
+        self.waypoints.append(form)
+        self.T.append(duration / 2)
 
-    def right(self, T):
-        self.pos = self.pos + np.array([[0, 0.5, 0]]).T
+    def move_twice(self, duration, vector):
+        self.waypoints.append(form + vector)
+        self.T.append(duration / 4)
+        self.waypoints.append(form)
+        self.T.append(duration / 4)
+        self.waypoints.append(form + vector)
+        self.T.append(duration / 4)
+        self.waypoints.append(form)
+        self.T.append(duration / 4)
 
-    def back(self):
-        self.pos = self.pos + np.array([[0.5, 0, 0]]).T
+    def rotate(self, duration, angle):
+        self.waypoints.append(formation.rotate_points_z(form, np.deg2rad(angle)))
+        self.T.append(duration / 2)
+        self.waypoints.append(form)
+        self.T.append(duration / 2)
 
+    def chacha(self, duration):
+        self.rotate(duration, 20)
 
-    def plan(self, waypoints, T):
-        pos_wp = waypoints[:, :, drone] + origin
-        yaw_wp = np.zeros((pos_wp.shape[0], 1))
-        traj = tgen.min_snap_4d(
-            np.hstack([pos_wp, yaw_wp]), T, stop=True)
-        self.trajlist.extend(Traj)
+    def left(self, duration):
+        self.move(duration, np.array([[0, -0.5, 0]]).T)
 
+    def right(self, duration):
+        self.move(duration, np.array([[0, 0.5, 0]]).T)
 
-chacha = ChaCha()
-chacha.wait(34)
+    def back(self, duration):
+        self.move(duration, np.array([[-0.5, 0, 0]]).T)
+
+    def hop(self, duration):
+        self.move(duration, np.array([[0, 0, 0.5]]).T)
+
+    def two_hops(self, duration):
+        self.move_twice(duration, np.array([[0, 0, 0.5]]).T)
+
+    def right_stomp(self, duration):
+        self.move(duration, np.array([[0, 0.2, -0.2]]).T)
+
+    def left_stomp(self, duration):
+        self.move(duration, np.array([[0, 0.2, -0.2]]).T)
+
+    def right_two_stomps(self, duration):
+        self.move_twice(duration, np.array([[0, 0.2, -0.2]]).T)
+
+    def left_two_stomps(self, duration):
+        self.move_twice(duration, np.array([[0, -0.2, -0.2]]).T)
+
+    def slide_left(self, duration):
+        self.left(duration)
+
+    def slide_right(self, duration):
+        self.right(duration)
+
+    def crisscross(self, duration):
+        self.rotate(duration, 90)
+
+    def turn_it_out(self, duration):
+        self.rotate(duration, -45)
+
+    def funky(self, duration):
+        self.move_twice(duration, np.array([[0, 0, 0.2]]).T)
+
+c = ChaCha()
+c.wait(34)
 for i in range(2):
-    chacha.left(2)
-    chacha.back(2)
-    chacha.hop(2)
-    chacha.right_stomp(3)
-    chacha.left_stomp(3)
-    chacha.chacha(5)
-    chacha.turn_it_out(2)
-    chacha.left(2)
-    chacha.back(3)
-    chacha.hop2(2)
-    chacha.right_stomp(2)
-    chacha.left_stomp(3)
-    chacha.chacha(4)
-    chacha.funk(2)
-    chacha.right(2)
-    chacha.left(2)
-    chacha.back(2)
-    chacha.hop(2)
-    chacha.hop(3)
-    chacha.right_two_stomps(3)
-    chacha.left_two_stomps(2)
-    chacha.slide_left(2)
-    chacha.slide_right(3)
-    chacha.crisscross(2)
-    chacha.crosscross(2)
-    chacha.chacha(5)
-
-#%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
-waypoints = np.array([
-    form, form,
-    form + hop, form,
-    form + hop, form,
-    form + hop, form,
-    form + hop, form,
-    form + left, form + left,
-    form + left + back, form + left + back,
-    form + left + back + hop, form + left + back,
-    form + left + back + hop, form + left + back,
-    form + left + back + hop, form + left + back,
-    formTakeoff, formTakeoff])
-
-plt.figure()
-ax = plt.axes(projection='3d')
-for point in range(waypoints.shape[2]):
-    ax.plot3D(waypoints[:, 0, point], waypoints[:, 1, point], waypoints[:, 2, point], '-')
-    ax.view_init(azim=45, elev=40)
-plt.title('waypoints')
-plt.show()
-
-#%% plan trajectories
-dist = np.linalg.norm(waypoints[1:, :, :] - waypoints[:-1, :, :], axis=1)
-dist_max = np.max(dist, axis=1)
-dist_max
-
-trajectories = []
-
-#T = 3*np.ones(len(dist_max))
-T = 1*np.ones(len(dist_max))
+    c.left(2)
+    c.back(2)
+    c.hop(2)
+    c.right_stomp(3)
+    c.left_stomp(3)
+    c.chacha(5)
+    c.turn_it_out(2)
+    c.left(2)
+    c.back(3)
+    c.two_hops(2)
+    c.right_stomp(2)
+    c.left_stomp(3)
+    c.chacha(4)
+    c.funky(2)
+    c.right(2)
+    c.left(2)
+    c.back(2)
+    c.hop(2)
+    c.hop(3)
+    c.right_two_stomps(3)
+    c.left_two_stomps(2)
+    c.slide_left(2)
+    c.slide_right(3)
+    c.crisscross(2)
+    c.crisscross(2)
+    c.chacha(5)
 
 origin = np.array([1.5, 2, 2])
+waypoints = np.array(c.waypoints)
+T = c.T
 
+trajectories = []
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
     yaw_wp = np.zeros((pos_wp.shape[0], 1))
-    traj = tgen.min_snap_4d(
-        np.hstack([pos_wp, yaw_wp]), T, stop=False)
+    traj = tgen.min_deriv_4d(4,
+                             np.hstack([pos_wp, yaw_wp]), T, stop=False)
     trajectories.append(traj)
 
-tgen.plot_trajectories_3d(trajectories)
-tgen.trajectories_to_json(trajectories, 'scripts/data/chacha.json')
+tgen.plot_trajectories(trajectories)
 plt.show()
-
-
-#%%
-for traj in trajectories:
-    tgen.plot_trajectory_derivatives(traj)
-    print('T', T)
-
-#%%
-
-
-#%%
+# %%
