@@ -7,7 +7,7 @@ from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 import numpy as np
 import bswarm.trajectory as tgen
-import bswarm.formation as form
+import bswarm.formation as formation
 import bswarm
 import json
 
@@ -36,7 +36,8 @@ formTakeoff = np.array([
 plot_formation(formTakeoff, 'takeoff')
 #%% P
 letter_scale = np.array([1.5, 1.5, 1.5])
-formP = scale_formation(np.array([
+formLetter = {}
+formLetter['P'] = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [-0.5, 0, 1],
     [-0.25, 0.5, 0.75],
@@ -44,10 +45,10 @@ formP = scale_formation(np.array([
     [0.5, -0.5, 0],
     [0, 0, 0.5],
 ]).T, letter_scale)
-plot_formation(formP, 'P')
+plot_formation(formLetter['P'], 'P')
 
 #%% U
-formU = scale_formation(np.array([
+formLetter['U'] = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [-0.5, 0.5, 1],
     [0, 0.5, 0.5],
@@ -55,9 +56,9 @@ formU = scale_formation(np.array([
     [0.5, -0.25, 0],
     [0.5, 0.25, 0],
 ]).T, letter_scale)
-plot_formation(formU, 'U')
+plot_formation(formLetter['U'], 'U')
 #%% 5
-form5 = scale_formation(np.array([
+formLetter['5'] = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [-0.5, 0.5, 1],
     [0, 0.25, 0.5],
@@ -65,10 +66,10 @@ form5 = scale_formation(np.array([
     [0.5, -0.5, 0],
     [0.5, 0.25, 0],
 ]).T, letter_scale)
-plot_formation(form5, '5')
+plot_formation(formLetter['5'], '5')
 
-#%% 0
-form0 = scale_formation(np.array([
+#%% O
+formLetter['O'] = scale_formation(np.array([
     [-0.5, -0.25, 1],
     [-0.5, 0.25, 1],
     [0, 0.5, 0.5],
@@ -76,11 +77,11 @@ form0 = scale_formation(np.array([
     [0.5, -0.25, 0],
     [0.5, 0.25, 0],
 ]).T, letter_scale)
-plot_formation(form0, '0')
+plot_formation(formLetter['O'], 'O')
 
 
 #%% A
-formA = scale_formation(np.array([
+formLetter['A'] = scale_formation(np.array([
     [0, -0.5, 0.5],
     [-0.5, 0, 1],
     [0, 0.5, 0.5],
@@ -88,10 +89,10 @@ formA = scale_formation(np.array([
     [0, 0, 0.5],
     [0.5, 0.5, 0],
 ]).T, letter_scale)
-plot_formation(formA, 'A')
+plot_formation(formLetter['A'], 'A')
 
 #%% L
-formL = scale_formation(np.array([
+formLetter['L'] = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [0, -0.5, 0.5],
     [0, 0.5, 0.5],
@@ -99,10 +100,10 @@ formL = scale_formation(np.array([
     [0.5, 0, 0],
     [0.5, 0.5, 0],
 ]).T, letter_scale)
-plot_formation(formL, 'L')
+plot_formation(formLetter['L'], 'L')
 
 #%% 1
-form1 = scale_formation(np.array([
+formLetter['1'] = scale_formation(np.array([
     [-0.5, -0.5, 1],
     [-0.5, 0, 1],
     [0, 0, 0.5],
@@ -110,21 +111,15 @@ form1 = scale_formation(np.array([
     [0.5, 0, 0],
     [0.5, 0.5, 0],
 ]).T, letter_scale)
-plot_formation(form1, '1')
+plot_formation(formLetter['1'], '1')
 
 
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
-waypoints = np.array([
-    formTakeoff, formTakeoff,  formTakeoff,
-    formTakeoff, formP, formP,
-    formTakeoff, formU, formU,
-    formTakeoff, formA, formA,
-    formTakeoff, formP, formP,
-    formTakeoff, form0, form0,
-    formTakeoff, formL, formL,
-    formTakeoff, formL, formL,
-    formTakeoff, form0, form0,
-    formTakeoff, formTakeoff, formTakeoff])
+waypoints = []
+for letter in 'P U A P O L L O'.split(' '):
+    waypoints.extend([formTakeoff, formLetter[letter], formLetter[letter]])
+waypoints.extend([formTakeoff, formTakeoff, formTakeoff])
+waypoints = np.array(waypoints)
 
 plt.figure()
 ax = plt.axes(projection='3d')
@@ -137,28 +132,41 @@ plt.show()
 #%% plan trajectories
 dist = np.linalg.norm(waypoints[1:, :, :] - waypoints[:-1, :, :], axis=1)
 dist_max = np.max(dist, axis=1)
-dist_max
 
-trajectories = []
 
-#T = 3*np.ones(len(dist_max))
-T = 5*np.ones(len(dist_max))
-
+wait_time = 5
 origin = np.array([1.5, 2, 2])
 
+trajectories = []
+T = 2*dist_max
+T = np.where(T == 0, wait_time, T)
 for drone in range(waypoints.shape[2]):
     pos_wp = waypoints[:, :, drone] + origin
     yaw_wp = np.zeros((pos_wp.shape[0], 1))
-    traj = tgen.min_snap_4d(
-        np.hstack([pos_wp, yaw_wp]), T, stop=True)
+    traj = tgen.min_deriv_4d(4, 
+        np.hstack([pos_wp, yaw_wp]), T, stop=False)
     trajectories.append(traj)
 
 tgen.plot_trajectories_3d(trajectories)
 tgen.trajectories_to_json(trajectories, 'scripts/data/p_form.json')
 plt.show()
 
-
 #%%
 for traj in trajectories:
     tgen.plot_trajectory_derivatives(traj)
-    print('T', T)
+
+#%%
+plt.figure()
+for m in range(4):
+    for traj in trajectories:
+        tgen.plot_trajectory_derivative_magnitudes(traj)
+
+#%%
+assert len(traj.coef_array()) < 31
+print('number of segments', len(traj.coef_array()), 'must be less than 31')
+#%%
+plt.figure()
+plt.title('durations')
+plt.bar(range(len(T)), T)
+
+#%%

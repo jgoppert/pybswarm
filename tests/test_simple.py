@@ -7,12 +7,6 @@ def test_load():
     bswarm.load_file()
     assert True
 
-
-def test_trajectory():
-    res = traj.plan_min_snap([1, 2, 3], [1, 2])
-    res.plot()
-
-
 def test_rotation():
     P = np.array([
         [1, 2, 3],

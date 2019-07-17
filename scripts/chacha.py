@@ -49,6 +49,65 @@ back = np.array([[0.5, 0, 0]]).T
 hop = np.array([[0, 0, 1]]).T
 down = np.array([[0, 0, 1]]).T
 
+class ChaCha():
+
+    def __init__(self, origin):
+        self.origin = origin
+        self.pos = np.array([[0, 0, 0]]).T
+        self.traj_list[]
+
+    def chacha(self, T):
+        self.pos = np.array([[0, 0, 0]]).T
+        self.plan()
+
+    def left(self, T):
+        self.pos = self.pos + np.array([[0, -0.5, 0]]).T
+
+    def right(self, T):
+        self.pos = self.pos + np.array([[0, 0.5, 0]]).T
+
+    def back(self):
+        self.pos = self.pos + np.array([[0.5, 0, 0]]).T
+
+
+    def plan(self, waypoints, T):
+        pos_wp = waypoints[:, :, drone] + origin
+        yaw_wp = np.zeros((pos_wp.shape[0], 1))
+        traj = tgen.min_snap_4d(
+            np.hstack([pos_wp, yaw_wp]), T, stop=True)
+        self.trajlist.extend(Traj)
+
+
+chacha = ChaCha()
+chacha.wait(34)
+for i in range(2):
+    chacha.left(2)
+    chacha.back(2)
+    chacha.hop(2)
+    chacha.right_stomp(3)
+    chacha.left_stomp(3)
+    chacha.chacha(5)
+    chacha.turn_it_out(2)
+    chacha.left(2)
+    chacha.back(3)
+    chacha.hop2(2)
+    chacha.right_stomp(2)
+    chacha.left_stomp(3)
+    chacha.chacha(4)
+    chacha.funk(2)
+    chacha.right(2)
+    chacha.left(2)
+    chacha.back(2)
+    chacha.hop(2)
+    chacha.hop(3)
+    chacha.right_two_stomps(3)
+    chacha.left_two_stomps(2)
+    chacha.slide_left(2)
+    chacha.slide_right(3)
+    chacha.crisscross(2)
+    chacha.crosscross(2)
+    chacha.chacha(5)
+
 #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
 waypoints = np.array([
     form, form,
