@@ -96,10 +96,10 @@ class ChaCha():
         self.move(duration, np.array([[-0.5, 0, 0]]).T)
 
     def hop(self, duration):
-        self.move(duration, np.array([[0, 0, 0.5]]).T)
+        self.move(duration, np.array([[0, 0, 0.2]]).T)
 
     def two_hops(self, duration):
-        self.move_twice(duration, np.array([[0, 0, 0.5]]).T)
+        self.move_twice(duration, np.array([[0, 0, 0.1]]).T)
 
     def right_stomp(self, duration):
         self.move(duration, np.array([[0, 0.2, -0.2]]).T)
@@ -120,16 +120,17 @@ class ChaCha():
         self.right(duration)
 
     def crisscross(self, duration):
-        self.rotate(duration, 90)
+        self.rotate(duration, 45)
 
     def turn_it_out(self, duration):
         self.rotate(duration, -45)
 
     def funky(self, duration):
-        self.move_twice(duration, np.array([[0, 0, 0.2]]).T)
+        self.move(duration, np.array([[0.1, 0.1, 0]]).T)
 
 c = ChaCha()
-c.wait(34)
+for i in range(17):
+    c.wait(2)
 for i in range(2):
     c.left(2)
     c.back(2)
@@ -172,4 +173,11 @@ for drone in range(waypoints.shape[2]):
 
 tgen.plot_trajectories(trajectories)
 plt.show()
+
 # %%
+tgen.plot_trajectories_time_history(trajectories)
+
+# %%
+tgen.animate_trajectories('chacha.mp4', trajectories, fps=5)
+
+#%%
