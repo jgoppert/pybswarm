@@ -16,6 +16,9 @@ from typing import List, Dict
 from cflib.crazyflie.syncCrazyflie import SyncCrazyflie
 from cflib.crazyflie import Crazyflie
 
+if sys.version_info[0] != 3:
+    print("This script requires Python 3")
+    exit()
 
 # Change uris and sequences according to your setup
 DRONE0 = 'radio://0/70/2M/E7E7E7E701'
@@ -70,23 +73,6 @@ class Uploader:
 
     def _upload_done(self, mem, addr):
         self._is_done = True
-
-
-def position_callback(timestamp, data, logconf):
-    x = data['kalman.stateX']
-    y = data['kalman.stateY']
-    z = data['kalman.stateZ']
-    print('Position: ({}, {}, {})'.format(x, y, z))
-
-
-def start_position_printing(scf):
-    log_conf = LogConfig(name='Position', period_in_ms=500)
-    log_conf.add_variable('kalman.stateX', 'float')
-    log_conf.add_variable('kalman.stateY', 'float')
-    log_conf.add_variable('kalman.stateZ', 'float')
-    scf.cf.log.add_config(log_conf)
-    log_conf.data_received_cb.add_callback(position_callback)
-    log_conf.start()
 
 
 def check_battery(scf: SyncCrazyflie, min_voltage=4.0):
@@ -184,7 +170,7 @@ def reset_estimator(scf: SyncCrazyflie):
     wait_for_position_estimator(scf)
 
 
-def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
+def upload_trajectory(scf: SyncCrazyflie, trajectory: List):
     trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
 
     total_duration = 0
@@ -198,12 +184,13 @@ def upload_trajectory(scf: SyncCrazyflie, trajectory_id: int, trajectory: List):
         total_duration += duration
 
     Uploader().upload(trajectory_mem)
-    scf.cf.high_level_commander.define_trajectory(trajectory_id, 0,
-                                                  len(trajectory_mem.poly4Ds))
+    cf = scf.cf  # type: Crazyflie
+    cf.high_level_commander.define_trajectory(
+        trajectory_id=1, offset=0, n_pieces=len(trajectory_mem.poly4Ds))
     return total_duration
 
 
-def preflight_sequence(scf: Crazyflie, trajectory: List):
+def preflight_sequence(scf: Crazyflie):
     """
     This is the preflight sequence. It calls all other subroutines before takeoff.
     """
@@ -223,7 +210,7 @@ def preflight_sequence(scf: Crazyflie, trajectory: List):
         # disable LED to save battery
         cf.param.set_value('ring.effect', '0')
 
-        # set pid gains
+        # set pid gains, tune down Kp to deal with UWB noise
         cf.param.set_value('posCtlPid.xKp', '1')
         cf.param.set_value('posCtlPid.yKp', '1')
         cf.param.set_value('posCtlPid.zKp', '1')
@@ -231,17 +218,11 @@ def preflight_sequence(scf: Crazyflie, trajectory: List):
         # check battery level
         check_battery(scf, 4.0)
 
-        # upload trajectory
-        upload_trajectory(scf, trajectory_id, trajectory)
-
         # reset the estimator
         reset_estimator(scf)
 
         # check state
         check_state(scf)
-
-        # print position to screen
-        # start_position_printing(scf)
 
     except Exception as e:
         print(e)
@@ -255,16 +236,15 @@ def go_sequence(scf: Crazyflie, trajectory: List):
     """
     try:
         cf = scf.cf  # type: Crazyflie
-        trajectory_id = 1
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.takeoff(2, 3.0)
         time.sleep(10.0)
-        relative = False
-        commander.start_trajectory(trajectory_id, 1.0, relative)
+        commander.start_trajectory(
+            trajectory_id=1, time_scale=1.0, relative=False)
         intensity = 1  # 0-1
         import itertools
-        color_cycle = itertools.cycle([            
-           # [0, 1, 0],
+        color_cycle = itertools.cycle([
+            # [0, 1, 0],
             [0, 0, 50],
             [255, 100, 15],
             [0, 0, 50]
@@ -285,7 +265,6 @@ def go_sequence(scf: Crazyflie, trajectory: List):
             # print('sleeping leg duration', leg_duration)
             time.sleep(leg_duration)
 
-        land_sequence(scf)
     except Exception as e:
         print(e)
         land_sequence(scf)
@@ -312,10 +291,12 @@ def run(args):
         traj_list = json.load(f)
 
     # building argumenprintts list in swarm
-    swarm_args = {}
-    for key in trajectory_assigment.keys():
-        trajectory = traj_list[str(key)]
-        swarm_args[trajectory_assigment[key]] = [trajectory]
+    def swarm_args(start, stop):
+        res = {}
+        for key in trajectory_assigment.keys():
+            trajectory = traj_list[str(key)]
+            res[trajectory_assigment[key]] = [trajectory[start:stop]]
+        return res
 
     with Swarm(uris, factory=factory) as swarm:
         def signal_handler(sig, frame):
@@ -325,8 +306,21 @@ def run(args):
 
         signal.signal(signal.SIGINT, signal_handler)
         print('Press Ctrl+C to land.')
-        swarm.parallel_safe(preflight_sequence, args_dict=swarm_args)
-        swarm.parallel(go_sequence, args_dict=swarm_args)
+
+        TRAJECTORY_MAX_LENGTH = 31
+        swarm.parallel_safe(preflight_sequence)
+
+        trajectory_count = 0
+        n_legs = len(traj_list[0])
+        while trajectory_count * TRAJECTORY_MAX_LENGTH < n_legs:
+            args = swarm_args(
+                TRAJECTORY_MAX_LENGTH * trajectory_count,
+                TRAJECTORY_MAX_LENGTH * (trajectory_count + 1))
+            print('Uploading Trajectory', trajectory_count, '...')
+            swarm.parallel_safe(upload_trajectory, args_dict=args)
+            swarm.parallel_safe(go_sequence, args_dict=args)
+            trajectory_count += 1
+        swarm.parallel(land_sequence)
 
 
 if __name__ == "__main__":
