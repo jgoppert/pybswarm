@@ -44,13 +44,6 @@ form = scale_formation(np.array([
 ]).T, form_scale)
 plot_formation(form, 'formation')
 
-waypoints = []
-
-
-def left(T):
-    waypoints.append()
-
-
 class ChaCha():
 
     def __init__(self):
@@ -58,8 +51,11 @@ class ChaCha():
         self.T = []
 
     def wait(self, duration):
+        for i in np.arange(0, duration, 2):
+            self.waypoints.append(form)
+            self.T.append(2)
         self.waypoints.append(form)
-        self.T.append(duration)
+        self.T.append(np.mod(duration, 2))
 
     def move(self, duration, vector):
         self.waypoints.append(form + vector)
@@ -108,10 +104,10 @@ class ChaCha():
         self.move(duration, np.array([[0, 0.2, -0.2]]).T)
 
     def right_two_stomps(self, duration):
-        self.move_twice(duration, np.array([[0, 0.2, -0.2]]).T)
+        self.move_twice(duration, np.array([[0, 0.1, -0.1]]).T)
 
     def left_two_stomps(self, duration):
-        self.move_twice(duration, np.array([[0, -0.2, -0.2]]).T)
+        self.move_twice(duration, np.array([[0, -0.1, -0.1]]).T)
 
     def slide_left(self, duration):
         self.left(duration)
@@ -129,8 +125,7 @@ class ChaCha():
         self.move(duration, np.array([[0.1, 0.1, 0]]).T)
 
 c = ChaCha()
-for i in range(17):
-    c.wait(2)
+c.wait(34)
 for i in range(2):
     c.left(2)
     c.back(2)
