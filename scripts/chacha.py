@@ -35,7 +35,7 @@ formTakeoff = np.array([
 ]).T
 plot_formation(formTakeoff, 'takeoff')
 # %% Square
-form_scale = np.array([1, 1, 1])
+form_scale = np.array([1.25, 1.25, 1])
 form = scale_formation(np.array([
     [0.5, -0.5, 0],
     [-0.5, -0.5, 0],
@@ -81,7 +81,7 @@ class ChaCha():
         self.T.append(duration / 2)
 
     def chacha(self, duration):
-        self.rotate(duration, 90)
+        self.rotate(duration, 45)
 
     def left(self, duration):
         self.move(duration, np.array([[0, -self.d, 0]]).T)
@@ -125,7 +125,7 @@ class ChaCha():
     def funky(self, duration):
         self.move(duration, np.array([[self.d, self.d, 0]]).T)
 
-c = ChaCha(0.7)
+c = ChaCha(0.5)
 
 print(len(c.waypoints))
 time_scale = 1
