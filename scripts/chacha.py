@@ -52,36 +52,26 @@ class ChaCha():
         self.d = d
 
     def wait(self, duration):
-        for i in np.arange(0, duration, 2):
-            self.waypoints.append(form)
-            self.T.append(2)
         self.waypoints.append(form)
-        self.T.append(np.mod(duration, 2))
+        self.T.append(duration)
 
     def move(self, duration, vector):
         self.waypoints.append(form + vector)
-        self.T.append(duration / 2)
-        self.waypoints.append(form)
-        self.T.append(duration / 2)
-
-    def move_twice(self, duration, vector):
-        self.waypoints.append(form + vector)
-        self.T.append(duration / 4)
-        self.waypoints.append(form)
-        self.T.append(duration / 4)
-        self.waypoints.append(form + vector)
-        self.T.append(duration / 4)
-        self.waypoints.append(form)
-        self.T.append(duration / 4)
+        self.T.append(duration)
 
     def rotate(self, duration, angle):
+        self.waypoints.append(formation.rotate_points_z(form, np.deg2rad(angle/2)))
+        self.T.append(duration / 4)
         self.waypoints.append(formation.rotate_points_z(form, np.deg2rad(angle)))
-        self.T.append(duration / 2)
+        self.T.append(duration / 4)
+        self.waypoints.append(formation.rotate_points_z(form, np.deg2rad(angle/2)))
+        self.T.append(duration / 4)
         self.waypoints.append(form)
-        self.T.append(duration / 2)
+        self.T.append(duration / 4)
 
     def chacha(self, duration):
-        self.rotate(duration, 45)
+        self.move(duration/2, np.array([[0, 0, self.d]]).T)
+        self.move(duration/2, np.array([[0, 0, 0]]).T)
 
     def left(self, duration):
         self.move(duration, np.array([[0, -self.d, 0]]).T)
@@ -90,73 +80,46 @@ class ChaCha():
         self.move(duration, np.array([[0, self.d, 0]]).T)
 
     def back(self, duration):
-        self.move(duration, np.array([[-self.d, 0, self.d]]).T)
+        self.move(duration, np.array([[-self.d, -self.d, 0]]).T)
 
     def hop(self, duration):
-        self.move(duration, np.array([[0, 0, self.d]]).T)
-
-    def two_hops(self, duration):
-        self.move_twice(duration, np.array([[0, 0, self.d]]).T)
+        self.move(duration/2, np.array([[0, 0, self.d]]).T)
+        self.move(duration/2, np.array([[0, 0, 0]]).T)
 
     def right_stomp(self, duration):
-        self.move(duration, np.array([[0, -self.d, -self.d]]).T)
+        self.move(duration/2, np.array([[0, 0, 0]]).T)
+        self.move(duration/2, np.array([[0, self.d/2, -self.d/2]]).T)
 
     def left_stomp(self, duration):
-        self.move(duration, np.array([[0, self.d, -self.d]]).T)
-
-    def right_two_stomps(self, duration):
-        self.move_twice(duration, np.array([[0, self.d, -self.d]]).T)
-
-    def left_two_stomps(self, duration):
-        self.move_twice(duration, np.array([[0, -self.d, -self.d]]).T)
-
-    def slide_left(self, duration):
-        self.left(duration)
-
-    def slide_right(self, duration):
-        self.right(duration)
+        self.move(duration/2, np.array([[0, 0, 0]]).T)
+        self.move(duration/2, np.array([[0, -self.d/2, -self.d/2]]).T)
 
     def crisscross(self, duration):
-        self.rotate(duration, 45)
-
-    def turn_it_out(self, duration):
-        self.rotate(duration, -45)
-
-    def funky(self, duration):
-        self.move(duration, np.array([[self.d, self.d, 0]]).T)
+        self.rotate(duration, 90)
 
 c = ChaCha(0.5)
 
 print(len(c.waypoints))
-time_scale = 1
-for i in range(2):
-    c.left(2*time_scale)
-    c.back(2*time_scale)
-    c.hop(2*time_scale)
-    c.right_stomp(3*time_scale)
-    c.left_stomp(3*time_scale)
-    c.chacha(5*time_scale)
-    c.turn_it_out(2*time_scale)
-    c.left(2*time_scale)
-    c.back(3*time_scale)
-    c.hop(2*time_scale)  # replacement for below
-    #c.two_hops(2*time_scale)  # too fast, replaced with hop
-    c.right_stomp(2*time_scale)
-    c.left_stomp(3*time_scale)
-    c.chacha(4*time_scale)
-    c.funky(2*time_scale)
-    c.right(2*time_scale)
-    c.left(2*time_scale)
-#c.back(2*time_scale)
-#c.hop(2*time_scale)
-#c.hop(3*time_scale)
-# c.right_two_stomps(3*time_scale)
-# c.left_two_stomps(2*time_scale)
-# c.slide_left(2*time_scale)
-# c.slide_right(3*time_scale)
-# c.crisscross(2*time_scale)
-# c.crisscross(2*time_scale)
-# c.chacha(5*time_scale)
+for i in range(4):
+    c.left(3)
+    c.back(2)
+    c.hop(3)
+    c.right_stomp(3)
+    c.left_stomp(3)
+    c.chacha(5)
+    c.right(3)
+    c.left(3)
+    c.back(2)
+    c.hop(3)
+    c.hop(3)  
+    c.right_stomp(2)
+    c.left_stomp(3)
+    c.left(2)
+    c.right(3)
+    c.crisscross(5)
+    c.chacha(5)
+    c.wait(1)
+
 
 print('length of waypoitns', len(c.waypoints))
 origin = np.array([1.5, 2, 2])
@@ -180,6 +143,6 @@ plt.show()
 tgen.plot_trajectories_time_history(trajectories)
 
 # %%
-#tgen.animate_trajectories('chacha.mp4', trajectories, fps=5)
+tgen.animate_trajectories('chacha.mp4', trajectories, fps=5)
 
 #%%
