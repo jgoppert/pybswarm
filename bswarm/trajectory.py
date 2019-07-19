@@ -382,9 +382,8 @@ def animate_trajectories(filename, trajectories, fps):
     plt.close()
 
 
-def trajectories_to_json(trajectories: List[Trajectory4D], filename: str):
+def trajectories_to_json(trajectories: List[Trajectory4D]):
     formation = {}
     for drone, traj in enumerate(trajectories):
         formation[drone] = traj.coef_array().tolist()
-    with open(filename, 'w') as f:
-        json.dump(formation, f)
+    return formation
