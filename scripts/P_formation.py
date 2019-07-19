@@ -167,7 +167,7 @@ class Letters:
         assert led_delay*len(formation.order) < duration
         self.T.append(duration)
         self.waypoints.append(bswarm.formation.rotate_points_z(formation.points, angle))
-        self.delays.append(np.array(formation.order)*led_delay)
+        self.delays.append((np.array(formation.order)*led_delay).tolist())
         self.colors.append(self.rgb[color])
 
     def plan_trajectory(self, origin):
@@ -208,6 +208,10 @@ def plan_letters(letter_string: str):
     return trajectories, data
 
 trajectories, data = plan_letters('P U A P O L L O')
+
+with open('scripts/data/p_form.json', 'w') as f:
+    json.dump(data, f)
+
 tgen.plot_trajectories(trajectories)
 plt.show()
 
@@ -232,7 +236,7 @@ plt.show()
 
 #%%
 
-tgen.animate_trajectories('p_formation.mp4', trajectories, fps=5)
+#tgen.animate_trajectories('p_formation.mp4', trajectories, fps=5)
 
 
 #%%
