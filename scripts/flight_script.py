@@ -71,8 +71,8 @@ class Uploader:
         print('upload started')
         self.trajectory_mem.write_data(self._upload_done)
         while not self._is_done:
-            print('upload sleeping')
-            time.sleep(0.2)
+            print('uploading...')
+            time.sleep(1)
 
     def _upload_done(self, mem, addr):
         print('upload is done')
@@ -121,7 +121,6 @@ def check_state(scf: SyncCrazyflie, min_voltage=4.0):
                         name, val, scf.cf.link_uri)
                     print(msg)
                     raise Exception(msg)
-            print('returning from checking state')
             return
 
 
@@ -203,16 +202,8 @@ def upload_trajectory(scf: SyncCrazyflie, data: Dict):
             trajectory_mem.poly4Ds.append(Poly4D(duration, x, y, z, yaw))
 
         print('Calling upload method')
-        upload_done = False
-
-        def callback(mem, addr):
-            upload_done = True
-            print('upload done')
-
-        trajectory_mem.write_data(callback)
-        while not upload_done:
-            print('uploading...')
-            time.sleep(0.2)
+        uploader = Uploader(trajectory_mem)
+        uploader.upload()
         
         print('Defining trajectory.')
         cf.high_level_commander.define_trajectory(
@@ -248,7 +239,7 @@ def preflight_sequence(scf: Crazyflie):
         cf.param.set_value('posCtlPid.zKp', '1')
 
         # check battery level
-        check_battery(scf, 4.0)
+        check_battery(scf, 2.0)
 
         # reset the estimator
         reset_estimator(scf)
@@ -295,7 +286,7 @@ def go_sequence(scf: Crazyflie, data: Dict):
         # initial led color
         cf.param.set_value('ring.effect', '7')
 
-        for color, delay, T in zip(data['colors'], data['delay'], data['T']):
+        for color, delay, T in zip(data['color'], data['delay'], data['T']):
             # change led color
             red = int(intensity * color[0])
             green = int(intensity * color[1])
@@ -336,7 +327,7 @@ def run(args):
     uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
     with open(args.json, 'r') as f:
         data = json.load(f)
-    swarm_args = {trajectory_assignment[drone_pos]: data[str(drone_pos)]
+    swarm_args = {trajectory_assignment[drone_pos]: [data[str(drone_pos)]]
         for drone_pos in trajectory_assignment.keys()}
 
     with Swarm(uris, factory=factory) as swarm:
@@ -366,7 +357,7 @@ def run(args):
                 swarm.parallel(upload_trajectory, args_dict=swarm_args)
 
             print('Go...')
-            swarm.parallel_safe(go_sequence, args_dict=args)
+            swarm.parallel_safe(go_sequence, args_dict=swarm_args)
         
         print('Land sequence...')
         swarm.parallel(land_sequence)

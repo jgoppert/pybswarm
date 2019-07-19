@@ -173,25 +173,28 @@ class Letters:
     def plan_trajectory(self, origin):
         trajectories = []
         waypoints = np.array(self.waypoints)
+        assert len(waypoints) < 33
         for drone in range(waypoints.shape[2]):
             pos_wp = waypoints[:, :, drone] + origin
             yaw_wp = np.zeros((pos_wp.shape[0], 1))
             traj = tgen.min_deriv_4d(4, 
                 np.hstack([pos_wp, yaw_wp]), self.T, stop=False)
             trajectories.append(traj)
+        assert len(trajectories) < 32
         return trajectories
 
 def plan_letters(letter_string: str):
     letters = Letters()
-    letters.add('takeoff', color='black', duration=2, led_delay=0)
+    letters.add('takeoff', color='blue', duration=2, led_delay=0)
     #%% Create waypoints for flat P -> slanted P -> rotating slanted P -> flat P
     for i, letter in enumerate(letter_string.split(' ')):
         letters.add('takeoff', color='blue', duration=5, led_delay=0)
         letters.add(letter, color='blue', duration=5, led_delay=0)
         letters.add(letter, color='gold', duration=5, led_delay=0.5)
         if i == 7:
-            for theta in np.linspace(0, 2*np.pi, 6)[1:]:
+            for theta in np.linspace(0, 2*np.pi, 5)[1:]:
                 letters.add(letter, color='gold', duration=3, led_delay=0, angle=theta)
+    letters.add('takeoff', color='blue', duration=5, led_delay=0)
     letters.add('takeoff', color='black', duration=5, led_delay=0)
 
     trajectories = letters.plan_trajectory(origin=np.array([1.5, 2, 2]))
