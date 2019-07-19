@@ -78,7 +78,7 @@ class Geometry:
         new_form = np.array(form)
         n_drones = form.shape[1]
         for i in rotation_order:
-            new_form[2, i] = np.sin(t + i*2*np.pi/n_drones)
+            new_form[2, i] = 0.2 * np.sin(t + i*2*np.pi/n_drones)
         return new_form
 
     def sin_wave(self, form, n, duration):
