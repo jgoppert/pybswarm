@@ -47,12 +47,12 @@ DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 # List of URIs, comment the one you do not want to fly
 # DRONE4 ## Faulty Drone // Does not work
 trajectory_assignment = {
-    0: DRONE15,
-    1: DRONE19,
+    #0: DRONE15,
+    #1: DRONE19,
     2: DRONE2,
-    3: DRONE9,
-    4: DRONE0,
-    5: DRONE12,
+    #3: DRONE9,
+    #4: DRONE0,
+    #5: DRONE12,
     # 6: DRONE7,
     # 7: DRONE17,
     # 8: DRONE18,
@@ -336,8 +336,7 @@ def run(args):
     uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
     with open(args.json, 'r') as f:
         data = json.load(f)
-
-    swarm_args = {trajectory_assignment[drone_pos]: data[drone_pos]
+    swarm_args = {trajectory_assignment[drone_pos]: data[str(drone_pos)]
         for drone_pos in trajectory_assignment.keys()}
 
     with Swarm(uris, factory=factory) as swarm:
@@ -376,12 +375,5 @@ def run(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('json')
-    parser.add_argument('--trace', action='store_true')
     args = parser.parse_args()
-    if args.trace:
-        run(args)
-    else:
-        try:
-            run(args)
-        except Exception as e:
-            print('exception', e)
+    run(args)
