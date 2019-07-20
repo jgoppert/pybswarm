@@ -133,12 +133,12 @@ class Geometry:
     def plan_trajectory(self):
         trajectories = []
         origin = np.array([1.5, 2, 2])
-
+        waypoints = np.array(self.waypoints)
         for drone in range(waypoints.shape[2]):
             pos_wp = waypoints[:, :, drone] + origin
             yaw_wp = np.zeros((pos_wp.shape[0], 1))
             traj = tgen.min_deriv_4d(4, 
-                np.hstack([pos_wp, yaw_wp]), T, stop=False)
+                np.hstack([pos_wp, yaw_wp]), self.T, stop=False)
             trajectories.append(traj)
 
         traj_json = tgen.trajectories_to_json(trajectories)
@@ -146,7 +146,7 @@ class Geometry:
         for key in traj_json.keys():
             data[key] = {
                 'trajectory': traj_json[key],
-                'T': T,
+                'T': self.T,
                 'color': g.colors,
                 'delay': [d[key] for d in g.delays]
             }
@@ -159,13 +159,15 @@ g = Geometry()
 #ooga chaka
 g.sin_wave(form=formTakeoff, n=4, duration=9, color='gold')
 #IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII gotta feeling
-g.goto(form=formCircle, duration=2, color='red')
-g.spiral(form=formCircle, z=1, n=7, duration=12, color='red')
+##g.goto(form=formCircle, duration=2, color='red')
+##g.spiral(form=formCircle, z=1, n=7, duration=12, color='red')
 #less popular part of chorus
-g.goto(form=formCircle, duration=2, color='green')
-g.rotate(form=formTriangle, n=9, duration=17, color='white')
+##g.goto(form=formCircle, duration=2, color='green')
+##g.rotate(form=formTriangle, n=9, duration=17, color='white')
 #before alcohol
-g.rotate(form=formCircle, n=8, duration=14, color='blue')
+##g.rotate(form=formCircle, n=8, duration=14, color='blue')
+
+
 
 #g.rotate(form=formCircle, n=7, duration=20)
 #g.rotate(form=formTriangle, n=4, duration=12)
@@ -174,9 +176,9 @@ g.rotate(form=formCircle, n=8, duration=14, color='blue')
 #g.spiral(form=formCircle, z=1, n=7, duration=28)
 #g.goto(form=formCircle, duration=2)
 #g.rotate(form=formTriangle, n=5, duration=18)
-g.goto(formTakeoff, 2, color='green')
+g.goto(formTakeoff, duration=2, color='green')
 
-##
+##a
 #18 secs for next segment of song
 ##
 
@@ -187,7 +189,7 @@ with open('scripts/data/HookedOnAFeeling.json', 'w') as f:
     json.dump(data, f)
 
 tgen.plot_trajectories(trajectories)
-#tgen.animate_trajectories('hooked.mp4', trajectories, 1)
+tgen.animate_trajectories('hooked.mp4', trajectories, 1)
 
 #%%
 plt.figure()
