@@ -200,7 +200,7 @@ def plan_letters(letter_string: str):
             for theta in np.linspace(0, 2*np.pi, 5)[1:]:
                 letters.add(letter, color='gold', duration=3, led_delay=0, angle=theta)
     letters.add('takeoff', color='blue', duration=5, led_delay=0)
-    letters.add('takeoff', color='black', duration=5, led_delay=0)
+    letters.add('takeoff', color='white', duration=10, led_delay=0.5)
 
     trajectories = letters.plan_trajectory(origin=np.array([1.5, 2, 2]))
     traj_json = tgen.trajectories_to_json(trajectories)
