@@ -266,7 +266,7 @@ def takeoff_sequence(scf: Crazyflie):
         cf.param.set_value('ring.solidGreen', str(0))
         cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(2, 3.0)
-        time.sleep(10.0)
+        time.sleep(3.0)
     except Exception as e:
         print(e)
         land_sequence(scf)
