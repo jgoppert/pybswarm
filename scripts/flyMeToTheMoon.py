@@ -171,6 +171,7 @@ class Geometry:
             }
         data['repeat'] = 2
         assert len(trajectories) < 32
+        assert len(self.T) < 32
         return trajectories, data
 
 # create trajectory waypoints
@@ -183,7 +184,7 @@ g.goto(form=formCircle, duration=3, color='white')
 g.goto(form=formTriangle, duration=3, color='black')
 # stars 14
 g.goto(form=formTriangle, duration=2, color='white')
-g.rotate(form=formTriangle, n=6, duration=12, color='white')
+g.rotate(form=formTriangle, n=5, duration=12, color='white')
 # hand 28
 g.goto(form=formHeart, duration=2, color='black') # change to heart
 g.rotate(form=formHeart, n=6, duration=9, color='red') # change to heart
