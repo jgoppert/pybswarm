@@ -285,6 +285,10 @@ def go_sequence(scf: Crazyflie, data: Dict):
 
         # initial led color
         cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', str(0))
+        cf.param.set_value('ring.solidGreen', str(255))
+        cf.param.set_value('ring.solidBlue', str(0))
+        time.sleep(0.1)
 
         for color, delay, T in zip(data['color'], data['delay'], data['T']):
             # change led color
