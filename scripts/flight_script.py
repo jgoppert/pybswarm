@@ -47,12 +47,12 @@ DRONE20 = 'radio://0/100/2M/E7E7E7E721'
 # List of URIs, comment the one you do not want to fly
 # DRONE4 ## Faulty Drone // Does not work
 trajectory_assignment = {
-    #0: DRONE15,
-    #1: DRONE19,
+    0: DRONE15,
+    1: DRONE19,
     2: DRONE2,
-    #3: DRONE9,
-    #4: DRONE0,
-    #5: DRONE12,
+    3: DRONE9,
+    4: DRONE16,
+    5: DRONE12,
     # 6: DRONE7,
     # 7: DRONE17,
     # 8: DRONE18,
@@ -239,7 +239,7 @@ def preflight_sequence(scf: Crazyflie):
         cf.param.set_value('posCtlPid.zKp', '1')
 
         # check battery level
-        check_battery(scf, 2.0)
+        check_battery(scf, 4.0)
 
         # reset the estimator
         reset_estimator(scf)

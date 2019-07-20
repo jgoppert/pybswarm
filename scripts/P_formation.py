@@ -167,7 +167,12 @@ class Letters:
         assert led_delay*len(formation.order) < duration
         self.T.append(duration)
         self.waypoints.append(bswarm.formation.rotate_points_z(formation.points, angle))
-        self.delays.append((np.array(formation.order)*led_delay).tolist())
+        delay = []
+        order = np.array(formation.order)
+        delay = np.zeros(len(formation.order))
+        for i, drone in enumerate(formation.order):
+            delay[drone] = i*led_delay
+        self.delays.append(delay.tolist())
         self.colors.append(self.rgb[color])
 
     def plan_trajectory(self, origin):
