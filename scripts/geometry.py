@@ -104,7 +104,7 @@ class Geometry:
     def spiral(self, form, z, n, duration, color):
         for t in np.linspace(0, 1, n):
             rot_form = formation.rotate_points_z(form, t*2*np.pi)
-            shift = np.array([[0, 0, t*np.sin(t)]]).T
+            shift = np.array([[0, 0, z*np.sin(t)]]).T
             self.waypoints.append(rot_form + shift)
             self.T.append(duration/n)
             self.colors.append(self.rgb[color])
