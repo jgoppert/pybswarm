@@ -55,16 +55,23 @@ for i_drone in rotation_order:
     theta = i_drone*2*np.pi/n_drones
     points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
 formCircle = scale_formation(np.array(points).T, form_scale)
+formCircle[2, 0] = 0.8
+formCircle[2, 1] = 1
+formCircle[2, 2] = 0.8
+formCircle[2, 3] = 0.2
+formCircle[2, 4] = 0
+formCircle[2, 5] = 0.2
+
 plot_formation(formCircle, 'circle')
 
 #%% heart #
 formHeart = np.array([
-    [-1, -0.5, 0],
-    [0, 0, 0],
-    [-1, 0.5, 0],
-    [0, -1.25, 0],
+    [-1, -0.7, 1],
+    [-0.1, 0, 0.6],
+    [-1, 0.7, 1],
+    [0, -1.25, 0.5],
     [1.25, 0, 0],
-    [0, 1.25, 0],
+    [0, 1.25, 0.5],
 ]).T
 plot_formation(formHeart, 'heart')
 
@@ -162,7 +169,7 @@ class Geometry:
                 'color': g.colors,
                 'delay': [d[key] for d in g.delays]
             }
-        data['repeat'] = 3
+        data['repeat'] = 2
         assert len(trajectories) < 32
         return trajectories, data
 
@@ -176,8 +183,7 @@ g.goto(form=formCircle, duration=3, color='white')
 g.goto(form=formTriangle, duration=3, color='black')
 # stars 14
 g.goto(form=formTriangle, duration=2, color='white')
-g.rotate(form=formTriangle, n=6, duration=10, color='white')
-g.goto(form=formCircle, duration=2, color='black')
+g.rotate(form=formTriangle, n=6, duration=12, color='white')
 # hand 28
 g.goto(form=formHeart, duration=2, color='black') # change to heart
 g.rotate(form=formHeart, n=6, duration=9, color='red') # change to heart
