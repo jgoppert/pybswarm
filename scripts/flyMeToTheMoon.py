@@ -177,7 +177,7 @@ class Geometry:
 # create trajectory waypoints
 g = Geometry()
 #ooga chaka
-g.goto(form=formTakeoff, duration=4, color='black')
+g.goto(form=formTakeoff, duration=4, color='blue')
 g.goto(form=formCircle, duration=4, color='black')
 # moon 8
 g.goto(form=formCircle, duration=3, color='white')
