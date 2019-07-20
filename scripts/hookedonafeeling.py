@@ -35,7 +35,7 @@ def scale_formation(form, scale):
 rotation_order = [4, 3, 2, 5, 0, 1]
 
 # scaling for formation
-form_scale = np.array([1.5, 1.5, 1])
+form_scale = np.array([1.8, 1.8, 1])
 
 # the takeoff formation
 formTakeoff = np.array([
@@ -67,6 +67,19 @@ for i_drone in rotation_order:
         points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0.5])
 formTriangle = scale_formation(np.array(points).T, form_scale)
 plot_formation(formTriangle, 'triangle')
+
+
+#%%
+points = []
+for i_drone in rotation_order:
+    theta = i_drone*2*np.pi/n_drones
+    if i_drone % 2 == 0:
+        points.append([0.5*np.cos(theta), 0.5*np.sin(theta), -0.5])
+    else:
+        points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0.5])
+formTriangle = scale_formation(np.array(points).T, form_scale)
+plot_formation(formTriangle, 'triangle')
+
 
 #%%
 
@@ -157,16 +170,17 @@ class Geometry:
 # create trajectory waypoints
 g = Geometry()
 #ooga chaka
-g.sin_wave(form=formTakeoff, n=4, duration=9, color='gold')
+g.goto(form=formTakeoff, duration=2, color='blue')
+g.sin_wave(form=formTakeoff, n=4, duration=7, color='gold')
 #IIIIIIIIIIIIIIIIIIIIIIIIIIIIIIIII gotta feeling
-##g.goto(form=formCircle, duration=2, color='red')
-##g.spiral(form=formCircle, z=1, n=7, duration=12, color='red')
+g.goto(form=formCircle, duration=2, color='red')
+g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
 #less popular part of chorus
-##g.goto(form=formCircle, duration=2, color='green')
-##g.rotate(form=formTriangle, n=9, duration=17, color='white')
+g.goto(form=formCircle, duration=2, color='green')
+g.rotate(form=formTriangle, n=6, duration=17, color='white')
 #before alcohol
-##g.rotate(form=formCircle, n=8, duration=14, color='blue')
-
+g.rotate(form=formCircle, n=6, duration=12, color='gold')
+g.goto(form=formTakeoff, duration=2, color='blue')
 
 
 #g.rotate(form=formCircle, n=7, duration=20)

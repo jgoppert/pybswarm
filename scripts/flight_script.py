@@ -313,6 +313,7 @@ def land_sequence(scf: Crazyflie):
         print('Landing...')
         time.sleep(3)
         # disable led to save battery
+        cf.param.set_value('ring.effect', '0')
         commander.stop()
     except Exception as e:
         print(e)
