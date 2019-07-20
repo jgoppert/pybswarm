@@ -69,9 +69,20 @@ plot_formation(formTriangle, 'triangle')
 
 class Geometry:
 
+    rgb = {
+        'black': [0, 0, 0],
+        'gold': [255, 100, 15],
+        'red': [255, 0, 0],
+        'green': [0, 255, 0],
+        'blue': [0, 0, 255],
+        'white': [255, 255, 255]
+    }
+
     def __init__(self):
-        self.T = []
         self.waypoints = [formTakeoff]
+        self.T = []
+        self.delays = []
+        self.colors = []
 
     @staticmethod
     def sin_z(form, t):
@@ -81,67 +92,83 @@ class Geometry:
             new_form[2, i] = np.sin(t + i*2*np.pi/n_drones)
         return new_form
 
-    def sin_wave(self, form, n, duration):
+    def sin_wave(self, form, n, duration, color):
         for t in np.linspace(0, duration, n):
             formSin = self.sin_z(form, t*np.pi/4)
             self.waypoints.append(formSin)
             self.T.append(duration/n)
+            self.colors.append(self.rgb[color])
+            n_drones = form.shape[1]
+            self.delays.append(np.zeros(n_drones).tolist())
 
-    def spiral(self, form, z, n, duration):
+    def spiral(self, form, z, n, duration, color):
         for t in np.linspace(0, 1, n):
             rot_form = formation.rotate_points_z(form, t*2*np.pi)
             shift = np.array([[0, 0, t*np.sin(t)]]).T
             self.waypoints.append(rot_form + shift)
             self.T.append(duration/n)
+            self.colors.append(self.rgb[color])
+            n_drones = form.shape[1]
+            self.delays.append(np.zeros(n_drones).tolist())
 
-    def rotate(self, form, n, duration):
+    def rotate(self, form, n, duration, color):
         for t in np.linspace(0, 1, n):
             rot_form = formation.rotate_points_z(form, t*2*np.pi)
             self.waypoints.append(rot_form)
             self.T.append(duration/n)
+            self.colors.append(self.rgb[color])
+            n_drones = form.shape[1]
+            self.delays.append(np.zeros(n_drones).tolist())
 
-    def goto(self, form, duration):
+    def goto(self, form, duration, color):
         self.waypoints.append(form)
         self.T.append(duration)
+        self.colors.append(self.rgb[color])
+        n_drones = form.shape[1]
+        self.delays.append(np.zeros(n_drones).tolist())
+    
+    def plan_trajectory(self):
+        trajectories = []
+        origin = np.array([1.5, 2, 2])
+
+        for drone in range(waypoints.shape[2]):
+            pos_wp = waypoints[:, :, drone] + origin
+            yaw_wp = np.zeros((pos_wp.shape[0], 1))
+            traj = tgen.min_deriv_4d(4, 
+                np.hstack([pos_wp, yaw_wp]), T, stop=False)
+            trajectories.append(traj)
+
+        traj_json = tgen.trajectories_to_json(trajectories)
+        data = {}
+        for key in traj_json.keys():
+            data[key] = {
+                'trajectory': traj_json[key],
+                'T': T,
+                'color': g.colors,
+                'delay': [d[key] for d in g.delays]
+            }
+        data['repeat'] = 3
+        assert len(trajectories) < 32
+        return trajectories, data
 
 # create trajectory waypoints
 g = Geometry()
-g.sin_wave(form=formTakeoff, n=8, duration=16)
-
-g.goto(form=formCircle, duration=2)
-g.rotate(form=formCircle, n=6, duration=12)
-g.rotate(form=formTriangle, n=6, duration=12)
-g.goto(form=formCircle, duration=2)
-g.spiral(form=formCircle, z=1, n=6, duration=12)
-g.goto(formTakeoff, 2)
-
-# get waypoints and durations
-waypoints = np.array(g.waypoints)
-T = g.T
-
-
-plt.figure()
-ax = plt.axes(projection='3d')
-for point in range(waypoints.shape[2]):
-    ax.plot3D(waypoints[:, 0, point], waypoints[:, 1, point], waypoints[:, 2, point], '-')
-    ax.view_init(azim=45, elev=40)
-plt.title('waypoints')
-plt.show()
+g.sin_wave(form=formTakeoff, n=8, duration=16, color='red')
+g.goto(form=formCircle, duration=2, color='blue')
+g.rotate(form=formCircle, n=6, duration=12, color='green')
+g.rotate(form=formTriangle, n=6, duration=12, color='white')
+g.goto(form=formCircle, duration=2, color='gold')
+g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
+g.goto(formTakeoff, 2, color='blue')
 
 #%% plan trajectories
-trajectories = []
-origin = np.array([1.5, 2, 2])
+trajectories, data = g.plan_trajectory()
 
-for drone in range(waypoints.shape[2]):
-    pos_wp = waypoints[:, :, drone] + origin
-    yaw_wp = np.zeros((pos_wp.shape[0], 1))
-    traj = tgen.min_deriv_4d(4, 
-        np.hstack([pos_wp, yaw_wp]), T, stop=False)
-    trajectories.append(traj)
+with open('scripts/data/geometry.json', 'w') as f:
+    json.dump(data, f)
 
-tgen.trajectories_to_json(trajectories, 'scripts/data/geometry.json')
 tgen.plot_trajectories(trajectories)
-tgen.animate_trajectories('geometry.mp4', trajectories, 1)
+#tgen.animate_trajectories('geometry.mp4', trajectories, 1)
 
 #%%
 plt.figure()
@@ -154,9 +181,12 @@ tgen.plot_trajectories_magnitudes(trajectories)
 plt.show()
 
 #%%
-print('number of segments', len(traj.coef_array()))
+print('number of segments', len(trajectories[0].coef_array()))
 #%%
 plt.figure()
 plt.title('durations')
-plt.bar(range(len(T)), T)
+plt.bar(range(len(g.T)), g.T)
 plt.show()
+
+
+#%%
