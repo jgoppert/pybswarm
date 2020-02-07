@@ -2,6 +2,7 @@ import  bswarm
 import bswarm.trajectory as traj
 import bswarm.formation
 import numpy as np
+import matplotlib.pyplot as plt
 
 def test_load():
     bswarm.load_file()
@@ -9,8 +10,11 @@ def test_load():
 
 
 def test_trajectory():
-    res = traj.plan_min_snap([1, 2, 3], [1, 2])
-    res.plot()
+    res = traj.min_snap_1d([1, 2, 3], [1, 2])
+    traj.plot_trajectory_derivatives(res)
+    plt.show(block=False)
+    plt.pause(1)
+    plt.close()
 
 
 def test_rotation():
