@@ -10,8 +10,9 @@ def test_load():
 
 
 def test_trajectory():
-    res = traj.min_snap_1d([1, 2, 3], [1, 2])
-    traj.plot_trajectory_derivatives(res)
+    res = traj.min_snap_1d([1, 2, 3], [1, 2], False)
+    plt.figure(figsize=(6, 5))
+    traj.plot_trajectories_time_history([res])
     plt.show(block=False)
     plt.pause(1)
     plt.close()
@@ -34,7 +35,7 @@ def test_trajectory_2d():
         [1, 2],
         [3, 4]
     ])
-    trajx = traj.min_accel_1d(waypoints[:, 0], T)
-    trajy = traj.min_accel_1d(waypoints[:, 1], T)
+    trajx = traj.min_accel_1d(waypoints[:, 0], T, False)
+    trajy = traj.min_accel_1d(waypoints[:, 1], T, False)
     print('x coef', trajx.coef_array())
     print('y coef', trajy.coef_array())
