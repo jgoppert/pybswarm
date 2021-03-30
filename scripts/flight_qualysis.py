@@ -31,22 +31,27 @@ if sys.version_info[0] != 3:
 DRONE0 = 'radio://0/81/2M/E7E7E7E770'
 DRONE1 = 'radio://0/81/2M/E7E7E7E771'
 
-# List of URIs, comment the one you do not want to fly
-# DRONE4 ## Faulty Drone // Does not work
 trajectory_assignment = {
     0: DRONE0,
     1: DRONE1,
 }
 
-id_assignment = {
-    DRONE0: [1,3,4,2],
-    DRONE1: [5,6,7,8],
-}
+n_drones = len(trajectory_assignment)
 
-rigid_bodies = {
-    DRONE0: 'cf0',
-    DRONE1: 'cf1',
-}
+body_names = []
+ids = [[1,3,4,2]]
+for i in range(n_drones):
+    body_names.append('cf'+str(i))
+    if i != 0:
+        ids.append([i*4 + j for j in ids[0]])
+
+id_assignment = {trajectory_assignment[i]: ids[i] for i in range(n_drones)}
+rigid_bodies = {trajectory_assignment[i]: body_names[i] for i in range(n_drones)}
+
+# rigid_bodies = {
+#     DRONE0: 'cf0',
+#     DRONE1: 'cf1',
+# }
 
 figure8 = [
     [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
@@ -62,11 +67,12 @@ figure8 = [
 ]
 
 class QtmWrapper(Thread):
-    def __init__(self, body_name):
+    def __init__(self, body_names):
         Thread.__init__(self)
 
-        self.body_name = body_name
-        self.on_pose = None
+        self.body_names = body_names
+        # self.on_pose = None
+        self.on_pose = {name: None for name in body_names}
         self.connection = None
         self.qtm_6DoF_labels = []
         self._stay_open = True
@@ -113,28 +119,33 @@ class QtmWrapper(Thread):
         if bodies is None:
             return
 
-        if self.body_name not in self.qtm_6DoF_labels:
-            print('Body ' + self.body_name + ' not found.')
+        # if self.body_name not in self.qtm_6DoF_labels:
+            # print('Body ' + self.body_name + ' not found.')
+        if len(set(self.qtm_6DoF_labels).intersection(body_names)) < n_drones :
+            print('Missing rigid bodies')
+            
         else:
-            index = self.qtm_6DoF_labels.index(self.body_name)
-            temp_cf_pos = bodies[index]
-            x = temp_cf_pos[0][0] / 1000
-            y = temp_cf_pos[0][1] / 1000
-            z = temp_cf_pos[0][2] / 1000
+            for body_name in self.body_names:
+                index = self.qtm_6DoF_labels.index(body_name)
+                temp_cf_pos = bodies[index]
+                x = temp_cf_pos[0][0] / 1000
+                y = temp_cf_pos[0][1] / 1000
+                z = temp_cf_pos[0][2] / 1000
 
-            r = temp_cf_pos[1].matrix
-            rot = [
-                [r[0], r[3], r[6]],
-                [r[1], r[4], r[7]],
-                [r[2], r[5], r[8]],
-            ]
+                r = temp_cf_pos[1].matrix
+                rot = [
+                    [r[0], r[3], r[6]],
+                    [r[1], r[4], r[7]],
+                    [r[2], r[5], r[8]],
+                ]
 
-            if self.on_pose:
-                # Make sure we got a position
-                if math.isnan(x):
-                    return
+                if self.on_pose:
+                    # Make sure we got a position
+                    if math.isnan(x):
+                        return
 
-                self.on_pose([x, y, z, rot])
+                    self.on_pose[body_name]([x, y, z, rot])
+
 
     async def _close(self):
         await self.connection.stream_frames_stop()
@@ -166,6 +177,13 @@ def send_extpose_rot_matrix(scf: SyncCrazyflie, x, y, z, rot):
     ql = math.sqrt(qx ** 2 + qy ** 2 + qz ** 2 + qw ** 2)
 
     cf.extpos.send_extpose(x, y, z, qx / ql, qy / ql, qz / ql, qw / ql)
+
+def send_extpos(scf: SyncCrazyflie, x, y, z):
+    """
+    Send only position data to the Crazyflie, same as cfclient and qualysis python resource
+    """
+    cf = scf.cf
+    cf.extpos.send_extpos(x, y, z)
 
 class Uploader:
     def __init__(self, trajectory_mem):
@@ -448,13 +466,12 @@ def land_sequence(scf: Crazyflie):
         print(e)
         land_sequence(scf)
 
-def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper):
+def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper, name):
     """
     This relays mocap data to each crazyflie
     """
     try:
-        # qtmWrapper = args_dict['qtmWrapper']  
-        qtmWrapper.on_pose = lambda pose: send_extpose_rot_matrix(scf, pose[0], pose[1], pose[2], pose[3])
+        qtmWrapper.on_pose[name] = lambda pose: send_extpose_rot_matrix(scf, pose[0], pose[1], pose[2], pose[3])
     except Exception as e:
         print(e)
         print('Could not relay mocap data')
@@ -519,7 +536,8 @@ def run():
     # swarm_args = {trajectory_assignment[drone_pos]: [data[str(drone_pos)]]
     #     for drone_pos in trajectory_assignment.keys()}
 
-    qtm_args = {key: [QtmWrapper(rigid_bodies[key])] for key in rigid_bodies.keys()} # args_dict for send6DOF
+    qtmWrapper = QtmWrapper(body_names)
+    qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
 
     with Swarm(uris, factory=factory) as swarm:
         
@@ -557,9 +575,8 @@ def run():
         print('Land sequence...')
         swarm.parallel(land_sequence)
 
-        print('Closing QTM connection...')
-        for val in qtm_args.values():
-            val[0].close()
+    print('Closing QTM connection...')
+
 
 waypoints0 = [
     [0.5, 0.5, 1.0, 0],
@@ -589,10 +606,11 @@ def run_waypoints():
 
     factory = CachedCfFactory(rw_cache='./cache')
     uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
-    qtm_args = {key: [QtmWrapper(rigid_bodies[key])] for key in rigid_bodies.keys()} # args_dict for send6DOF
+    # qtm_args = {key: [QtmWrapper(rigid_bodies[key])] for key in rigid_bodies.keys()} # args_dict for send6DOF
+    qtmWrapper = QtmWrapper(body_names)
+    qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
 
     with Swarm(uris, factory=factory) as swarm:
-        
         def signal_handler(sig, frame):
             print('You pressed Ctrl+C!')
             swarm.parallel(land_sequence)
@@ -615,11 +633,8 @@ def run_waypoints():
         swarm.parallel(land_sequence)
 
         print('Closing QTM connection...')
-        for val in qtm_args.values():
-            val[0].close()
 
-
-
+    qtmWrapper.close()
 
 
 if __name__ == "__main__":
