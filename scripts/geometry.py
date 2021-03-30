@@ -2,6 +2,7 @@
 import sys
 import os
 sys.path.insert(0, os.getcwd())
+os.chdir('../')
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -130,9 +131,9 @@ class Geometry:
     def plan_trajectory(self):
         trajectories = []
         origin = np.array([1.5, 2, 2])
-
-        for drone in range(waypoints.shape[2]):
-            pos_wp = waypoints[:, :, drone] + origin
+        self.waypoints = np.array(self.waypoints)
+        for drone in range(self.waypoints.shape[2]):
+            pos_wp = self.waypoints[:, :, drone] + origin
             yaw_wp = np.zeros((pos_wp.shape[0], 1))
             traj = tgen.min_deriv_4d(4, 
                 np.hstack([pos_wp, yaw_wp]), T, stop=False)
