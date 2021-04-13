@@ -18,6 +18,7 @@ def plot_formation(F, name):
     plt.figure()
     ax = plt.axes(projection='3d')
     ax.plot3D(F[0, :], F[1, :], F[2, :], 'ro')
+    
     plt.title(name)
     ax.set_xlabel('x, m')
     ax.set_ylabel('y, m')
@@ -33,41 +34,39 @@ def scale_formation(form, scale):
 #%% parameters
 
 # defines how the drones are ordered for circles etc.
-rotation_order = [4, 3, 2, 5, 0, 1]
+rotation_order = [2, 1, 0]
 
 # scaling for formation
 form_scale = np.array([1.5, 1.5, 1])
 
 # the takeoff formation
 formTakeoff = np.array([
-    [-0.5, -1, 0],
-    [-0.5, 0, 0],
-    [-0.5, 1, 0],
-    [0.5, -1, 0],
-    [0.5, 0, 0],
-    [0.5, 1, 0],
+    [-1, 0, 0],
+    [0, 0, 0],
+    [1, 0, 0],
 ]).T
 n_drones = formTakeoff.shape[1]
 
 plot_formation(formTakeoff, 'takeoff')
-points = []
-for i_drone in rotation_order:
-    theta = i_drone*2*np.pi/n_drones
-    points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
-formCircle = scale_formation(np.array(points).T, form_scale)
-plot_formation(formCircle, 'circle')
 
-points = []
-for i_drone in rotation_order:
-    theta = i_drone*2*np.pi/n_drones
-    if i_drone % 2 == 0:
-        points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
-    else:
-        points.append([0.25*np.cos(theta), 0.25*np.sin(theta), 0])
-formTriangle = scale_formation(np.array(points).T, form_scale)
-plot_formation(formTriangle, 'triangle')
+# points = []
+# for i_drone in rotation_order:
+#     theta = i_drone*2*np.pi/n_drones
+#     points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
+# formCircle = scale_formation(np.array(points).T, form_scale)
+# plot_formation(formCircle, 'circle')
 
+# points = []
+# for i_drone in rotation_order:
+#     theta = i_drone*2*np.pi/n_drones
+#     if i_drone % 2 == 0:
+#         points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
+#     else:
+#         points.append([0.25*np.cos(theta), 0.25*np.sin(theta), 0])
+# formTriangle = scale_formation(np.array(points).T, form_scale)
+# plot_formation(formTriangle, 'triangle')
 
+# %%
 class Geometry:
 
     rgb = {
@@ -93,40 +92,48 @@ class Geometry:
             new_form[2, i] = np.sin(t + i*2*np.pi/n_drones)
         return new_form
 
-    def sin_wave(self, form, n, duration, color):
+    def sin_wave(self, form, n, duration, color=None):
         for t in np.linspace(0, duration, n):
             formSin = self.sin_z(form, t*np.pi/4)
             self.waypoints.append(formSin)
             self.T.append(duration/n)
-            self.colors.append(self.rgb[color])
             n_drones = form.shape[1]
             self.delays.append(np.zeros(n_drones).tolist())
 
-    def spiral(self, form, z, n, duration, color):
+            if color != None:
+                self.colors.append(self.rgb[color])
+
+    def spiral(self, form, z, n, duration, color=None):
         for t in np.linspace(0, 1, n):
             rot_form = formation.rotate_points_z(form, t*2*np.pi)
             shift = np.array([[0, 0, z*np.sin(t)]]).T
             self.waypoints.append(rot_form + shift)
             self.T.append(duration/n)
-            self.colors.append(self.rgb[color])
             n_drones = form.shape[1]
             self.delays.append(np.zeros(n_drones).tolist())
 
-    def rotate(self, form, n, duration, color):
+            if color != None:
+                self.colors.append(self.rgb[color])
+
+    def rotate(self, form, n, duration, color=None):
         for t in np.linspace(0, 1, n):
             rot_form = formation.rotate_points_z(form, t*2*np.pi)
             self.waypoints.append(rot_form)
             self.T.append(duration/n)
-            self.colors.append(self.rgb[color])
             n_drones = form.shape[1]
             self.delays.append(np.zeros(n_drones).tolist())
+            
+            if color != None:
+                self.colors.append(self.rgb[color])
 
-    def goto(self, form, duration, color):
+    def goto(self, form, duration, color=None):
         self.waypoints.append(form)
         self.T.append(duration)
-        self.colors.append(self.rgb[color])
         n_drones = form.shape[1]
         self.delays.append(np.zeros(n_drones).tolist())
+
+        if color != None:
+            self.colors.append(self.rgb[color])
     
     def plan_trajectory(self):
         trajectories = []
@@ -154,13 +161,13 @@ class Geometry:
 
 # create trajectory waypoints
 g = Geometry()
-g.sin_wave(form=formTakeoff, n=8, duration=16, color='red')
-g.goto(form=formCircle, duration=2, color='blue')
-g.rotate(form=formCircle, n=6, duration=12, color='green')
-g.rotate(form=formTriangle, n=6, duration=12, color='white')
-g.goto(form=formCircle, duration=2, color='gold')
-g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
-g.goto(formTakeoff, 2, color='blue')
+g.sin_wave(form=formTakeoff, n=8, duration=16)
+# g.goto(form=formCircle, duration=2, color='blue')
+# g.rotate(form=formCircle, n=6, duration=12, color='green')
+# g.rotate(form=formTriangle, n=6, duration=12, color='white')
+# g.goto(form=formCircle, duration=2, color='gold')
+# g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
+g.goto(formTakeoff, 2)
 
 #%% plan trajectories
 trajectories, data = g.plan_trajectory()

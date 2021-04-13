@@ -2,6 +2,7 @@
 import sys
 import os
 sys.path.insert(0, os.getcwd())
+os.chdir('../')
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt

@@ -30,13 +30,29 @@ if sys.version_info[0] != 3:
 # Change uris and sequences according to your setup
 DRONE0 = 'radio://0/81/2M/E7E7E7E770'
 DRONE1 = 'radio://0/81/2M/E7E7E7E771'
+DRONE2 = 'radio://0/81/2M/E7E7E7E772'
 
-trajectory_assignment = {
-    0: DRONE0,
-    1: DRONE1,
-}
+DRONE3 = 'radio://0/82/2M/E7E7E7E773'
+DRONE4 = 'radio://0/82/2M/E7E7E7E774'
+DRONE5 = 'radio://0/82/2M/E7E7E7E775'
 
-n_drones = len(trajectory_assignment)
+DRONE6 = 'radio://0/83/2M/E7E7E7E776'
+DRONE7 = 'radio://0/83/2M/E7E7E7E777'
+DRONE8 = 'radio://0/83/2M/E7E7E7E778'
+
+uris = [
+    # DRONE0,
+    # DRONE1,
+    # DRONE2,
+    # DRONE3,
+    # DRONE4,
+    # DRONE5,
+    DRONE6,
+    DRONE7,
+    DRONE8,
+]
+
+n_drones = len(uris)
 
 body_names = []
 ids = [[1,3,4,2]]
@@ -46,14 +62,12 @@ for i in range(n_drones):
         ids.append([i*4 + j for j in ids[0]])
 
 print('Defined bodies are: ', body_names)
+print('Deck ids are:', ids)
 
+trajectory_assignment = {i: uris[i] for i in range(n_drones)}
+print('Trajectory assignment is: ', trajectory_assignment)
 id_assignment = {trajectory_assignment[i]: ids[i] for i in range(n_drones)}
 rigid_bodies = {trajectory_assignment[i]: body_names[i] for i in range(n_drones)}
-
-# rigid_bodies = {
-#     DRONE0: 'cf0',
-#     DRONE1: 'cf1',
-# }
 
 figure8 = [
     [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
@@ -128,7 +142,7 @@ class QtmWrapper(Thread):
         intersect = set(self.qtm_6DoF_labels).intersection(body_names) 
         if len(intersect) < n_drones :
             print('Missing rigid bodies')
-            print('In qualisys: ', self.qtm_6DoF_labels)
+            print('In QTM: ', self.qtm_6DoF_labels)
             print('Intersection: ', intersect)
             time.sleep(0.5)
             
@@ -173,28 +187,22 @@ def send_extpose_rot_matrix(scf: SyncCrazyflie, x, y, z, rot):
     Send the current Crazyflie X, Y, Z position and attitude as a (3x3)
     rotaton matrix. This is going to be forwarded to the Crazyflie's
     position estimator.
+    By default the attitude is not sent.
     """
     cf = scf.cf
 
-    qw = _sqrt(1 + rot[0][0] + rot[1][1] + rot[2][2]) / 2
-    qx = _sqrt(1 + rot[0][0] - rot[1][1] - rot[2][2]) / 2
-    qy = _sqrt(1 - rot[0][0] + rot[1][1] - rot[2][2]) / 2
-    qz = _sqrt(1 - rot[0][0] - rot[1][1] + rot[2][2]) / 2
-
-    # Normalize the quaternion
-    ql = math.sqrt(qx ** 2 + qy ** 2 + qz ** 2 + qw ** 2)
-
     if send_full_pose:
+        qw = _sqrt(1 + rot[0][0] + rot[1][1] + rot[2][2]) / 2
+        qx = _sqrt(1 + rot[0][0] - rot[1][1] - rot[2][2]) / 2
+        qy = _sqrt(1 - rot[0][0] + rot[1][1] - rot[2][2]) / 2
+        qz = _sqrt(1 - rot[0][0] - rot[1][1] + rot[2][2]) / 2
+
+        # Normalize the quaternion
+        ql = math.sqrt(qx ** 2 + qy ** 2 + qz ** 2 + qw ** 2)
+
         cf.extpos.send_extpose(x, y, z, qx / ql, qy / ql, qz / ql, qw / ql)
     else:
         cf.extpos.send_extpos(x, y, z)
-
-def send_extpos(scf: SyncCrazyflie, x, y, z):
-    """
-    Send only position data to the Crazyflie, same as cfclient and qualysis python resource
-    """
-    cf = scf.cf
-    cf.extpos.send_extpos(x, y, z)
 
 class Uploader:
     def __init__(self, trajectory_mem):
@@ -320,8 +328,8 @@ def activate_kalman_estimator(cf):
     # kalman filter. The default value seems to be a bit too low.
     cf.param.set_value('locSrv.extQuatStdDev', 0.06)
 
-# def upload_trajectory(scf: SyncCrazyflie, data: Dict):
-def upload_trajectory(scf: SyncCrazyflie):
+def upload_trajectory(scf: SyncCrazyflie, data: Dict):
+# def upload_trajectory(scf: SyncCrazyflie):
     try:
         cf = scf.cf  # type: Crazyflie
 
@@ -329,8 +337,8 @@ def upload_trajectory(scf: SyncCrazyflie):
         trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
 
         TRAJECTORY_MAX_LENGTH = 31
-        # trajectory = data['trajectory']
-        trajectory =  figure8
+        trajectory = data['trajectory']
+        # trajectory =  figure8
 
         if len(trajectory) > TRAJECTORY_MAX_LENGTH:
             raise ValueError("Trajectory too long for drone {:s}".format(cf.link_uri))
@@ -376,11 +384,6 @@ def preflight_sequence(scf: Crazyflie):
         # make sure not already flying
         # land_sequence(scf)
 
-        # set pid gains, tune down Kp to deal with UWB noise
-        # cf.param.set_value('posCtlPid.xKp', '1')
-        # cf.param.set_value('posCtlPid.yKp', '1')
-        # cf.param.set_value('posCtlPid.zKp', '1')
-
         # check battery level
         check_battery(scf, 3.7)
 
@@ -394,47 +397,6 @@ def preflight_sequence(scf: Crazyflie):
         print(e)
         land_sequence(scf)
         raise(e)
-
-
-def preflight_sequence_waypoint(scf: Crazyflie):
-    """
-    This is the preflight sequence. It calls all other subroutines before takeoff.
-    """
-    cf = scf.cf  # type: Crazyflie
-
-    try:
-        # switch to Kalman filter
-        cf.param.set_value('stabilizer.estimator', '2')
-        cf.param.set_value('locSrv.extQuatStdDev', 0.06)
-
-        # enable high level commander
-        cf.param.set_value('commander.enHighLevel', '0')
-
-        # ensure params are downloaded
-        wait_for_param_download(scf)
-
-        # make sure not already flying
-        # land_sequence(scf)
-
-        # set pid gains, tune down Kp to deal with UWB noise
-        # cf.param.set_value('posCtlPid.xKp', '1')
-        # cf.param.set_value('posCtlPid.yKp', '1')
-        # cf.param.set_value('posCtlPid.zKp', '1')
-
-        # check battery level
-        check_battery(scf, 3.7)
-
-        # reset the estimator
-        reset_estimator(scf)
-
-        # check state
-        check_state(scf)
-
-    except Exception as e:
-        print(e)
-        land_sequence(scf)
-        raise(e)
-
 
 def takeoff_sequence(scf: Crazyflie):
     """
@@ -444,14 +406,14 @@ def takeoff_sequence(scf: Crazyflie):
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         cf.param.set_value('commander.enHighLevel', '1')
-        commander.takeoff(1.0, 3.0)
-        time.sleep(10.0)
+        commander.takeoff(1.5, 3.0)
+        time.sleep(3.0)
     except Exception as e:
         print(e)
         land_sequence(scf)
 
-# def go_sequence(scf: Crazyflie, data: Dict):
-def go_sequence(scf: Crazyflie):
+def go_sequence(scf: Crazyflie, data: Dict):
+# def go_sequence(scf: Crazyflie):
     """
     This is the go sequence. It commands the trajectory to start.
     """
@@ -460,7 +422,9 @@ def go_sequence(scf: Crazyflie):
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.start_trajectory(
             trajectory_id=1, time_scale=1.0, relative=True)
-        time.sleep(10.0)
+
+        time.sleep(sum(data['T']))
+        
     except Exception as e:
         print(e)
         land_sequence(scf)
@@ -506,7 +470,7 @@ def id_update(scf: SyncCrazyflie, id: List):
     cf.param.set_value('activeMarker.right', str(id[3]))
     time.sleep(1)
     
-    print('done!')
+    print('done! |'+ scf._link_uri)
 
 def swarm_id_update():
     cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -516,19 +480,54 @@ def swarm_id_update():
     id_args = {key: [id_assignment[key]] for key in id_assignment.keys()}
     with Swarm(uris, factory=factory) as swarm:
         print('Starting ID update')
-        swarm.parallel_safe(id_update, id_args)
+        swarm.sequential(id_update, id_args)
 
-def run():
-# def run(args):
+def hover():
     cflib.crtp.init_drivers(enable_debug_driver=False)
 
     factory = CachedCfFactory(rw_cache='./cache')
     uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
+
+    qtmWrapper = QtmWrapper(body_names)
+    qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
+
+    with Swarm(uris, factory=factory) as swarm:
+        
+        def signal_handler(sig, frame):
+            print('You pressed Ctrl+C!')
+            swarm.parallel(land_sequence)
+            sys.exit(0)
+
+        signal.signal(signal.SIGINT, signal_handler)
+        print('Press Ctrl+C to land.')
     
-    # with open(args.json, 'r') as f:
-    #     data = json.load(f)
-    # swarm_args = {trajectory_assignment[drone_pos]: [data[str(drone_pos)]]
-    #     for drone_pos in trajectory_assignment.keys()}
+        print('Starting mocap data relay...')
+        swarm.parallel_safe(send6DOF, qtm_args)
+
+        print('Preflight sequence...')
+        swarm.parallel_safe(preflight_sequence)
+
+        print('Takeoff sequence...')
+        swarm.parallel_safe(takeoff_sequence)
+
+        print('Land sequence...')
+        swarm.parallel(land_sequence)
+
+    print('Closing QTM connection...')
+    qtmWrapper.close()
+
+# def run():
+def run(args):
+    cflib.crtp.init_drivers(enable_debug_driver=False)
+
+    factory = CachedCfFactory(rw_cache='./cache')
+    uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
+    print(uris)
+    
+    with open(args.json, 'r') as f:
+        data = json.load(f)
+    swarm_args = {trajectory_assignment[drone_pos]: [data[str(drone_pos)]]
+        for drone_pos in trajectory_assignment.keys()}
 
     qtmWrapper = QtmWrapper(body_names)
     qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
@@ -560,12 +559,12 @@ def run():
         for trajectory_count in range(1):
             if trajectory_count == 0:
                 print('Uploading Trajectory')
-                # swarm.parallel(upload_trajectory, args_dict=swarm_args)
-                swarm.parallel(upload_trajectory)
+                swarm.parallel(upload_trajectory, args_dict=swarm_args)
+                # swarm.parallel(upload_trajectory)
 
             print('Go...')
-            # swarm.parallel_safe(go_sequence, args_dict=swarm_args)
-            swarm.parallel_safe(go_sequence)
+            swarm.parallel_safe(go_sequence, args_dict=swarm_args)
+            # swarm.parallel_safe(go_sequence)
         print('Land sequence...')
         swarm.parallel(land_sequence)
 
@@ -576,13 +575,15 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('mode')
 
-    # parser.add_argument('--json')
+    parser.add_argument('--json')
     args = parser.parse_args()
     # run(args)
 
     if args.mode == 'id':
         swarm_id_update()
     elif args.mode == 'traj':
-        run()
+        run(args)
+    elif args.mode == 'hover':
+        hover()
     else:
         print('Not a valid input!!!')
