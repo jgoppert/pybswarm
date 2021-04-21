@@ -28,22 +28,22 @@ if sys.version_info[0] != 3:
     exit()
 
 # Change uris and sequences according to your setup
-DRONE0 = 'radio://0/81/2M/E7E7E7E770'
-DRONE1 = 'radio://0/81/2M/E7E7E7E771'
-DRONE2 = 'radio://0/81/2M/E7E7E7E772'
+DRONE0 = 'radio://0/81/250K/E7E7E7E770'
+DRONE1 = 'radio://0/81/250K/E7E7E7E771'
+DRONE2 = 'radio://0/81/250K/E7E7E7E772'
 
-DRONE3 = 'radio://0/82/2M/E7E7E7E773'
-DRONE4 = 'radio://0/82/2M/E7E7E7E774'
-DRONE5 = 'radio://0/82/2M/E7E7E7E775'
+DRONE3 = 'radio://0/82/250K/E7E7E7E773'
+DRONE4 = 'radio://0/82/250K/E7E7E7E774'
+DRONE5 = 'radio://0/82/250K/E7E7E7E775'
 
-DRONE6 = 'radio://0/83/2M/E7E7E7E776'
-DRONE7 = 'radio://0/83/2M/E7E7E7E777'
-DRONE8 = 'radio://0/83/2M/E7E7E7E778'
+DRONE6 = 'radio://0/91/250K/E7E7E7E776'
+DRONE7 = 'radio://0/91/250K/E7E7E7E777'
+DRONE8 = 'radio://0/91/250K/E7E7E7E778'
 
 uris = [
-    # DRONE0,
-    # DRONE1,
-    # DRONE2,
+    DRONE0,
+    DRONE1,
+    DRONE2,
     # DRONE3,
     # DRONE4,
     # DRONE5,
@@ -94,6 +94,8 @@ class QtmWrapper(Thread):
         self.connection = None
         self.qtm_6DoF_labels = []
         self._stay_open = True
+        self.last_send = time.time()
+        self.dt_min = 0.2
 
         self.start()
 
@@ -113,7 +115,7 @@ class QtmWrapper(Thread):
     async def _connect(self):
         # qtm_instance = await self._discover()
         # host = qtm_instance.host
-        host = "192.168.1.16"
+        host = "192.168.1.2"
         print('Connecting to QTM on ' + host)
         self.connection = await qtm.connect(host=host, version="1.20")
 
@@ -132,6 +134,13 @@ class QtmWrapper(Thread):
             return qtm_instance
 
     def _on_packet(self, packet):
+        now = time.time()
+        dt = now - self.last_send
+        if dt < self.dt_min:
+            return
+        self.last_send = time.time()
+        print('Hz: ', 1.0/dt)
+        
         header, bodies = packet.get_6d()
 
         if bodies is None:
@@ -144,8 +153,7 @@ class QtmWrapper(Thread):
             print('Missing rigid bodies')
             print('In QTM: ', self.qtm_6DoF_labels)
             print('Intersection: ', intersect)
-            time.sleep(0.5)
-            
+            return            
         else:
             for body_name in self.body_names:
                 index = self.qtm_6DoF_labels.index(body_name)
@@ -164,7 +172,8 @@ class QtmWrapper(Thread):
                 if self.on_pose[body_name]:
                     # Make sure we got a position
                     if math.isnan(x):
-                        return
+                        print("====== Lost RB Trakcing ABORT ABORT ABORT !!!! =======")
+                        continue
 
                     self.on_pose[body_name]([x, y, z, rot])
 
@@ -222,7 +231,7 @@ class Uploader:
         self.trajectory_mem.disconnect()
 
 
-def check_battery(scf: SyncCrazyflie, min_voltage=3.7):
+def check_battery(scf: SyncCrazyflie, min_voltage=4):
     print('Checking battery...')
     log_config = LogConfig(name='Battery', period_in_ms=500)
     log_config.add_variable('pm.vbat', 'float')
@@ -384,8 +393,15 @@ def preflight_sequence(scf: Crazyflie):
         # make sure not already flying
         # land_sequence(scf)
 
+        cf.param.set_value('ring.effect', '0')
+
+        # set pid gains, tune down Kp to smooth trajectories
+        cf.param.set_value('posCtlPid.xKp', '1')
+        cf.param.set_value('posCtlPid.yKp', '1')
+        cf.param.set_value('posCtlPid.zKp', '1')
+
         # check battery level
-        check_battery(scf, 3.7)
+        check_battery(scf, 3.8)
 
         # reset the estimator
         reset_estimator(scf)
@@ -406,8 +422,12 @@ def takeoff_sequence(scf: Crazyflie):
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         cf.param.set_value('commander.enHighLevel', '1')
+        cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', str(0))
+        cf.param.set_value('ring.solidGreen', str(0))
+        cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(1.5, 3.0)
-        time.sleep(3.0)
+        time.sleep(10.0)
     except Exception as e:
         print(e)
         land_sequence(scf)
@@ -421,9 +441,30 @@ def go_sequence(scf: Crazyflie, data: Dict):
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.start_trajectory(
-            trajectory_id=1, time_scale=1.0, relative=True)
+            trajectory_id=1, time_scale=1.0, relative=False)
 
-        time.sleep(sum(data['T']))
+        intensity = 1  # 0-1
+
+        # initial led color
+        cf.param.set_value('ring.effect', '7')
+        cf.param.set_value('ring.solidRed', str(0))
+        cf.param.set_value('ring.solidGreen', str(255))
+        cf.param.set_value('ring.solidBlue', str(0))
+        time.sleep(0.1)
+
+        for color, delay, T in zip(data['color'], data['delay'], data['T']):
+            # change led color
+            red = int(intensity * color[0])
+            green = int(intensity * color[1])
+            blue = int(intensity * color[2])
+            #print('setting color', red, blue, green)
+            time.sleep(delay)
+            cf.param.set_value('ring.solidRed', str(red))
+            cf.param.set_value('ring.solidBlue', str(blue))
+            cf.param.set_value('ring.solidGreen', str(green))
+            # wait for leg to complete
+            # print('sleeping leg duration', leg_duration)
+            time.sleep(T - delay)
         
     except Exception as e:
         print(e)
@@ -436,10 +477,12 @@ def land_sequence(scf: Crazyflie):
         commander.land(0.0, 3.0)
         print('Landing...')
         time.sleep(3)
+
+        # disable led to save battery
+        cf.param.set_value('ring.effect', '0')
         commander.stop()
     except Exception as e:
         print(e)
-        land_sequence(scf)
 
 def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper, name):
     """
@@ -460,7 +503,10 @@ def id_update(scf: SyncCrazyflie, id: List):
     # default id
     # [f, b, l, r] 
     # [1, 3, 4, 2]
-
+    
+    # disable led to save battery
+    cf.param.set_value('ring.effect', '0')
+    
     cf.param.set_value('activeMarker.front', str(id[0]))
     time.sleep(1)
     cf.param.set_value('activeMarker.back', str(id[1]))
@@ -560,11 +606,9 @@ def run(args):
             if trajectory_count == 0:
                 print('Uploading Trajectory')
                 swarm.parallel(upload_trajectory, args_dict=swarm_args)
-                # swarm.parallel(upload_trajectory)
 
             print('Go...')
             swarm.parallel_safe(go_sequence, args_dict=swarm_args)
-            # swarm.parallel_safe(go_sequence)
         print('Land sequence...')
         swarm.parallel(land_sequence)
 

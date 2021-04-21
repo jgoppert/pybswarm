@@ -2,7 +2,6 @@
 import sys
 import os
 sys.path.insert(0, os.getcwd())
-os.chdir('../')
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -37,6 +36,10 @@ rotation_order = [4, 3, 2, 5, 0, 1]
 
 # scaling for formation
 form_scale = np.array([1.5, 1.5, 1])
+
+# offset = np.array([
+#     [0.156,-3.343,0]
+# ])
 
 # the takeoff formation
 formTakeoff = np.array([
@@ -90,7 +93,7 @@ class Geometry:
         new_form = np.array(form)
         n_drones = form.shape[1]
         for i in rotation_order:
-            new_form[2, i] = np.sin(t + i*2*np.pi/n_drones)
+            new_form[2, i] = 0.5*np.sin(t + i*2*np.pi/n_drones)
         return new_form
 
     def sin_wave(self, form, n, duration, color):
@@ -130,13 +133,14 @@ class Geometry:
     
     def plan_trajectory(self):
         trajectories = []
-        origin = np.array([1.5, 2, 2])
+        origin = np.array([0, 0, 2])
         self.waypoints = np.array(self.waypoints)
         for drone in range(self.waypoints.shape[2]):
             pos_wp = self.waypoints[:, :, drone] + origin
             yaw_wp = np.zeros((pos_wp.shape[0], 1))
             traj = tgen.min_deriv_4d(4, 
-                np.hstack([pos_wp, yaw_wp]), self.T, stop=False)
+                np.hstack([pos_wp, yaw_wp]), self.
+                T, stop=False)
             trajectories.append(traj)
 
         traj_json = tgen.trajectories_to_json(trajectories)
@@ -144,7 +148,7 @@ class Geometry:
         for key in traj_json.keys():
             data[key] = {
                 'trajectory': traj_json[key],
-                'T': self.T[key],
+                'T': self.T,
                 'color': g.colors,
                 'delay': [d[key] for d in g.delays]
             }
@@ -162,6 +166,8 @@ g.goto(form=formCircle, duration=2, color='gold')
 g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
 g.goto(formTakeoff, 2, color='blue')
 
+
+
 #%% plan trajectories
 trajectories, data = g.plan_trajectory()
 
@@ -169,7 +175,7 @@ with open('scripts/data/geometry.json', 'w') as f:
     json.dump(data, f)
 
 tgen.plot_trajectories(trajectories)
-tgen.animate_trajectories('geometry.mp4', trajectories, 1)
+# tgen.animate_trajectories('geometry.mp4', trajectories, 1)
 
 #%%
 plt.figure()
