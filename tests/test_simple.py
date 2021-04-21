@@ -1,9 +1,15 @@
-import  bswarm
+#%%
+import os, sys
+os.chdir('../')
+print(os.getcwd())
+#%%
+import bswarm
 import bswarm.trajectory as traj
 import bswarm.formation
 import numpy as np
 import matplotlib.pyplot as plt
 
+#%%
 def test_load():
     bswarm.load_file()
     assert True
@@ -39,3 +45,5 @@ def test_trajectory_2d():
     trajy = traj.min_accel_1d(waypoints[:, 1], T, False)
     print('x coef', trajx.coef_array())
     print('y coef', trajy.coef_array())
+
+# %%

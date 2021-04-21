@@ -13,6 +13,8 @@ __pycache__/
 *.so
 *~
 
+.ipynb_checkpoints
+
 # due to using tox and pytest
 .tox
 .cache
