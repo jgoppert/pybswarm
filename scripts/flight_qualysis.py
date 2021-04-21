@@ -69,33 +69,20 @@ print('Trajectory assignment is: ', trajectory_assignment)
 id_assignment = {trajectory_assignment[i]: ids[i] for i in range(n_drones)}
 rigid_bodies = {trajectory_assignment[i]: body_names[i] for i in range(n_drones)}
 
-figure8 = [
-    [1.050000, 0.000000, -0.000000, 0.000000, -0.000000, 0.830443, -0.276140, -0.384219, 0.180493, -0.000000, 0.000000, -0.000000, 0.000000, -1.356107, 0.688430, 0.587426, -0.329106, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.710000, 0.396058, 0.918033, 0.128965, -0.773546, 0.339704, 0.034310, -0.026417, -0.030049, -0.445604, -0.684403, 0.888433, 1.493630, -1.361618, -0.139316, 0.158875, 0.095799, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.620000, 0.922409, 0.405715, -0.582968, -0.092188, -0.114670, 0.101046, 0.075834, -0.037926, -0.291165, 0.967514, 0.421451, -1.086348, 0.545211, 0.030109, -0.050046, -0.068177, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.700000, 0.923174, -0.431533, -0.682975, 0.177173, 0.319468, -0.043852, -0.111269, 0.023166, 0.289869, 0.724722, -0.512011, -0.209623, -0.218710, 0.108797, 0.128756, -0.055461, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.560000, 0.405364, -0.834716, 0.158939, 0.288175, -0.373738, -0.054995, 0.036090, 0.078627, 0.450742, -0.385534, -0.954089, 0.128288, 0.442620, 0.055630, -0.060142, -0.076163, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.560000, 0.001062, -0.646270, -0.012560, -0.324065, 0.125327, 0.119738, 0.034567, -0.063130, 0.001593, -1.031457, 0.015159, 0.820816, -0.152665, -0.130729, -0.045679, 0.080444, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.700000, -0.402804, -0.820508, -0.132914, 0.236278, 0.235164, -0.053551, -0.088687, 0.031253, -0.449354, -0.411507, 0.902946, 0.185335, -0.239125, -0.041696, 0.016857, 0.016709, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.620000, -0.921641, -0.464596, 0.661875, 0.286582, -0.228921, -0.051987, 0.004669, 0.038463, -0.292459, 0.777682, 0.565788, -0.432472, -0.060568, -0.082048, -0.009439, 0.041158, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [0.710000, -0.923935, 0.447832, 0.627381, -0.259808, -0.042325, -0.032258, 0.001420, 0.005294, 0.288570, 0.873350, -0.515586, -0.730207, -0.026023, 0.288755, 0.215678, -0.148061, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-    [1.053185, -0.398611, 0.850510, -0.144007, -0.485368, -0.079781, 0.176330, 0.234482, -0.153567, 0.447039, -0.532729, -0.855023, 0.878509, 0.775168, -0.391051, -0.713519, 0.391628, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000],  # noqa
-]
-
-send_full_pose = False
+send_full_pose = False # ignore attitude data from QTM, send only x,y,z positions
 
 class QtmWrapper(Thread):
     def __init__(self, body_names):
         Thread.__init__(self)
 
         self.body_names = body_names
-        # self.on_pose = None
         self.on_pose = {name: None for name in body_names}
         self.connection = None
         self.qtm_6DoF_labels = []
         self._stay_open = True
+
         self.last_send = time.time()
-        self.dt_min = 0.2
+        self.dt_min = 0.2 # reducing send_extpose rate to 5HZ
 
         self.start()
 
@@ -117,7 +104,7 @@ class QtmWrapper(Thread):
         # host = qtm_instance.host
         host = "192.168.1.2"
         print('Connecting to QTM on ' + host)
-        self.connection = await qtm.connect(host=host, version="1.20")
+        self.connection = await qtm.connect(host=host, version="1.20") # version 1.21 has weird 6DOF labels, so using 1.20 here
 
         print(type(self.connection))
         params = await self.connection.get_parameters(parameters=['6d'])
@@ -146,8 +133,6 @@ class QtmWrapper(Thread):
         if bodies is None:
             return
 
-        # if self.body_name not in self.qtm_6DoF_labels:
-            # print('Body ' + self.body_name + ' not found.')
         intersect = set(self.qtm_6DoF_labels).intersection(body_names) 
         if len(intersect) < n_drones :
             print('Missing rigid bodies')
@@ -172,11 +157,10 @@ class QtmWrapper(Thread):
                 if self.on_pose[body_name]:
                     # Make sure we got a position
                     if math.isnan(x):
-                        print("====== Lost RB Trakcing ABORT ABORT ABORT !!!! =======")
+                        print("======= Lost RB Trakcing!!! Abort Suggested!!! =======")
                         continue
 
                     self.on_pose[body_name]([x, y, z, rot])
-
 
     async def _close(self):
         await self.connection.stream_frames_stop()
@@ -338,7 +322,6 @@ def activate_kalman_estimator(cf):
     cf.param.set_value('locSrv.extQuatStdDev', 0.06)
 
 def upload_trajectory(scf: SyncCrazyflie, data: Dict):
-# def upload_trajectory(scf: SyncCrazyflie):
     try:
         cf = scf.cf  # type: Crazyflie
 
@@ -347,7 +330,6 @@ def upload_trajectory(scf: SyncCrazyflie, data: Dict):
 
         TRAJECTORY_MAX_LENGTH = 31
         trajectory = data['trajectory']
-        # trajectory =  figure8
 
         if len(trajectory) > TRAJECTORY_MAX_LENGTH:
             raise ValueError("Trajectory too long for drone {:s}".format(cf.link_uri))
@@ -433,7 +415,6 @@ def takeoff_sequence(scf: Crazyflie):
         land_sequence(scf)
 
 def go_sequence(scf: Crazyflie, data: Dict):
-# def go_sequence(scf: Crazyflie):
     """
     This is the go sequence. It commands the trajectory to start.
     """
@@ -516,7 +497,7 @@ def id_update(scf: SyncCrazyflie, id: List):
     cf.param.set_value('activeMarker.right', str(id[3]))
     time.sleep(1)
     
-    print('done! |'+ scf._link_uri)
+    print('ID update done! |'+ scf._link_uri)
 
 def swarm_id_update():
     cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -525,8 +506,8 @@ def swarm_id_update():
     uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
     id_args = {key: [id_assignment[key]] for key in id_assignment.keys()}
     with Swarm(uris, factory=factory) as swarm:
-        print('Starting ID update')
-        swarm.sequential(id_update, id_args)
+        print('Starting ID update...')
+        swarm.sequential(id_update, id_args) # parallel update has some issue with more than 3 drones, using sequential update here.
 
 def hover():
     cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -562,7 +543,6 @@ def hover():
     print('Closing QTM connection...')
     qtmWrapper.close()
 
-# def run():
 def run(args):
     cflib.crtp.init_drivers(enable_debug_driver=False)
 
@@ -621,7 +601,6 @@ if __name__ == "__main__":
 
     parser.add_argument('--json')
     args = parser.parse_args()
-    # run(args)
 
     if args.mode == 'id':
         swarm_id_update()
