@@ -41,8 +41,27 @@ waypoints.append(
 
 waypoints = np.array(waypoints)
 
+rgb = {
+    'black': [0, 0, 0],
+    'gold': [255, 100, 15],
+    'red': [255, 0, 0],
+    'green': [0, 255, 0],
+    'blue': [0, 0, 255],
+    'white': [255, 255, 255]
+}
+
+
 # time to take on each leg, must be length of waypoints - 1
 time_vector = [5, 5]
+
+# color vector, must be length of waypoints - 1
+colors = [
+    rgb['white'],
+    rgb['blue'],
+]
+
+# delay, must be length of waypoints - 1
+delays = [0, 0]
 
 assert len(waypoints) < 33
 trajectories = []
@@ -55,7 +74,20 @@ for drone in range(waypoints.shape[2]):
         np.hstack([pos_wp, yaw_wp]), time_vector, stop=False)
     trajectories.append(traj)
 assert len(trajectories) < 32
-data = tgen.trajectories_to_json(trajectories)
+traj_json = tgen.trajectories_to_json(trajectories)
+data = {}
+for key in traj_json.keys():
+    data[key] = {
+        'trajectory': traj_json[key],
+        'T': time_vector,
+        'color': colors,
+        'delay': delays
+    }
+# how many times to repeat trajectory
+data['repeat'] = 1
+assert len(trajectories) < 32
+assert len(time_vector) < 32
+
 
 
 with open('scripts/data/block_land.json', 'w') as f:
