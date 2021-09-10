@@ -28,29 +28,26 @@ if sys.version_info[0] != 3:
     exit()
 
 # Change uris and sequences according to your setup
-DRONE0 = 'radio://0/81/250K/E7E7E7E770'
-DRONE1 = 'radio://0/81/250K/E7E7E7E771'
-DRONE2 = 'radio://0/81/250K/E7E7E7E772'
+DRONE0 = 'radio://0/80/250K/E7E7E7E7E0'
+DRONE1 = 'radio://0/80/250K/E7E7E7E7E1'
+DRONE2 = 'radio://0/80/250K/E7E7E7E7E2'
 
-DRONE3 = 'radio://0/82/250K/E7E7E7E773'
-DRONE4 = 'radio://0/82/250K/E7E7E7E774'
-DRONE5 = 'radio://0/82/250K/E7E7E7E775'
+DRONE3 = 'radio://0/90/250K/E7E7E7E7E3'
+DRONE4 = 'radio://0/90/250K/E7E7E7E7E4'
+DRONE5 = 'radio://0/90/250K/E7E7E7E7E5'
 
-DRONE6 = 'radio://0/91/250K/E7E7E7E776'
-DRONE7 = 'radio://0/91/250K/E7E7E7E777'
-DRONE8 = 'radio://0/91/250K/E7E7E7E778'
+# DRONE6 = 'radio://0/91/250K/E7E7E7E776'
+# DRONE7 = 'radio://0/91/250K/E7E7E7E777'
+# DRONE8 = 'radio://0/91/250K/E7E7E7E778'
 
-uris = [
-    DRONE0,
-    DRONE1,
-    DRONE2,
-    # DRONE3,
-    # DRONE4,
-    # DRONE5,
-    DRONE6,
-    DRONE7,
-    DRONE8,
-]
+one_drone = [DRONE0]
+
+three_drone = [DRONE3, DRONE4, DRONE5]
+
+six_drone = [DRONE0, DRONE1, DRONE2, DRONE3, DRONE4, DRONE5]
+
+uris = one_drone
+
 
 n_drones = len(uris)
 
@@ -126,7 +123,7 @@ class QtmWrapper(Thread):
         if dt < self.dt_min:
             return
         self.last_send = time.time()
-        print('Hz: ', 1.0/dt)
+        # print('Hz: ', 1.0/dt)
         
         header, bodies = packet.get_6d()
 
@@ -157,7 +154,7 @@ class QtmWrapper(Thread):
                 if self.on_pose[body_name]:
                     # Make sure we got a position
                     if math.isnan(x):
-                        print("======= Lost RB Trakcing!!! Abort Suggested!!! =======")
+                        print("======= LOST RB TRACKING =======")
                         continue
 
                     self.on_pose[body_name]([x, y, z, rot])
@@ -369,6 +366,13 @@ def preflight_sequence(scf: Crazyflie):
         # enable high level commander
         cf.param.set_value('commander.enHighLevel', '1')
 
+        # prepare for motor shut-off
+        cf.param.set_value('motorPowerSet.enable', '0')
+        cf.param.set_value('motorPowerSet.m1', '0')
+        cf.param.set_value('motorPowerSet.m2', '0')
+        cf.param.set_value('motorPowerSet.m3', '0')
+        cf.param.set_value('motorPowerSet.m4', '0')
+
         # ensure params are downloaded
         wait_for_param_download(scf)
 
@@ -383,7 +387,7 @@ def preflight_sequence(scf: Crazyflie):
         cf.param.set_value('posCtlPid.zKp', '1')
 
         # check battery level
-        check_battery(scf, 3.8)
+        check_battery(scf, 3.7)
 
         # reset the estimator
         reset_estimator(scf)
@@ -396,6 +400,19 @@ def preflight_sequence(scf: Crazyflie):
         land_sequence(scf)
         raise(e)
 
+def sleep_while_checking_stable(scf: Crazyflie, tf_sec, dt_sec=0.1):
+    log_config = LogConfig(name='Roll', period_in_ms=int(dt_sec*1000.0))
+    log_config.add_variable('stabilizer.roll', 'float')
+    t_sec = 0
+    while t_sec < tf_sec:
+        with SyncLogger(scf, log_config) as logger:
+            for log_entry in logger:
+                log_data = log_entry[1]
+                roll = log_data['stabilizer.roll']
+                if np.abs(roll) > 60:
+                    raise Exception("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
+        t_sec += dt_sec
+
 def takeoff_sequence(scf: Crazyflie):
     """
     This is the takeoff sequence. It commands takeoff.
@@ -406,13 +423,13 @@ def takeoff_sequence(scf: Crazyflie):
         cf.param.set_value('commander.enHighLevel', '1')
         cf.param.set_value('ring.effect', '7')
         cf.param.set_value('ring.solidRed', str(0))
-        cf.param.set_value('ring.solidGreen', str(0))
+        cf.param.set_value('ring.solidGreen', str(255))
         cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(1.5, 3.0)
-        time.sleep(10.0)
+        sleep_while_checking_stable(scf, tf_sec=15)
     except Exception as e:
         print(e)
-        land_sequence(scf)
+        kill_motor_sequence(scf)
 
 def go_sequence(scf: Crazyflie, data: Dict):
     """
@@ -439,17 +456,22 @@ def go_sequence(scf: Crazyflie, data: Dict):
             green = int(intensity * color[1])
             blue = int(intensity * color[2])
             #print('setting color', red, blue, green)
-            time.sleep(delay)
+            sleep_while_checking_stable(scf, tf_sec=delay)
             cf.param.set_value('ring.solidRed', str(red))
             cf.param.set_value('ring.solidBlue', str(blue))
             cf.param.set_value('ring.solidGreen', str(green))
             # wait for leg to complete
             # print('sleeping leg duration', leg_duration)
-            time.sleep(T - delay)
+            sleep_while_checking_stable(scf, tf_sec=T - delay)
         
     except Exception as e:
         print(e)
         land_sequence(scf)
+
+def kill_motor_sequence(scf: Crazyflie):
+    cf = scf.cf
+    cf.param.set_value('commander.enHighLevel', '0')
+    cf.param.set_value('motorPowerSet.enable', '1')
 
 def land_sequence(scf: Crazyflie):
     try:
@@ -457,7 +479,7 @@ def land_sequence(scf: Crazyflie):
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.land(0.0, 3.0)
         print('Landing...')
-        time.sleep(3)
+        sleep_while_checking_stable(scf, tf_sec=3)
 
         # disable led to save battery
         cf.param.set_value('ring.effect', '0')
