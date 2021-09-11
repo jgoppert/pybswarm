@@ -380,7 +380,7 @@ def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1):
             batt = log_data['pm.vbat']
             if np.abs(roll) > 60:
                 raise UnstableException("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
-            print("battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
+            # print("battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             if batt < 3.0:
                 raise LowBatteryException("low battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             t_sec += dt_sec
