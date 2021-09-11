@@ -161,9 +161,9 @@ g = Geometry()
 g.sin_wave(form=formTakeoff, n=8, duration=16, color='red')
 g.goto(form=formCircle, duration=2, color='blue')
 g.rotate(form=formCircle, n=6, duration=12, color='green')
-g.rotate(form=formTriangle, n=6, duration=12, color='white')
-g.goto(form=formCircle, duration=2, color='gold')
-g.spiral(form=formCircle, z=1, n=6, duration=12, color='red')
+g.rotate(form=formTriangle, n=6, duration=12, color='red')
+g.goto(form=formCircle, duration=2, color='blue')
+g.spiral(form=formCircle, z=1, n=6, duration=12, color='green')
 g.goto(formTakeoff, 2, color='blue')
 
 

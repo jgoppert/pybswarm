@@ -6,5 +6,6 @@ dependencies:
   - pip
   - patchelf
   - cx_freeze
+  - matplotlib
   - pip:
     - cfclient
