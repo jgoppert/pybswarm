@@ -40,6 +40,9 @@ DRONE5 = 'radio://0/90/250K/E7E7E7E7E5'
 # DRONE7 = 'radio://0/91/250K/E7E7E7E777'
 # DRONE8 = 'radio://0/91/250K/E7E7E7E778'
 
+SEND_FULL_POSE = True
+
+
 def assignments(count):
     one_drone = [DRONE0]
     three_drone = [DRONE0, DRONE1, DRONE2]
@@ -198,19 +201,37 @@ def send_extpose_rot_matrix(scf: SyncCrazyflie, x, y, z, rot):
     """
     cf = scf.cf
 
-    send_full_pose = False # ignore attitude data from QTM, send only x,y,z positions
-
-
-    if send_full_pose:
-        qw = _sqrt(1 + rot[0][0] + rot[1][1] + rot[2][2]) / 2
-        qx = _sqrt(1 + rot[0][0] - rot[1][1] - rot[2][2]) / 2
-        qy = _sqrt(1 - rot[0][0] + rot[1][1] - rot[2][2]) / 2
-        qz = _sqrt(1 - rot[0][0] - rot[1][1] + rot[2][2]) / 2
-
-        # Normalize the quaternion
-        ql = math.sqrt(qx ** 2 + qy ** 2 + qz ** 2 + qw ** 2)
-
-        cf.extpos.send_extpose(x, y, z, qx / ql, qy / ql, qz / ql, qw / ql)
+    if SEND_FULL_POSE:
+        trace = rot[0][0] + rot[1][1] + rot[2][2]
+        if trace > 0:
+            a = _sqrt(1 + trace)
+            qw = 0.5*a
+            b = 0.5/a
+            qx = (rot[2][1] - rot[1][2])*b
+            qy = (rot[0][2] - rot[2][0])*b
+            qz = (rot[1][0] - rot[0][1])*b
+        elif rot[0][0] > rot[1][1] and rot[0][0] > rot[2][2]:
+            a = _sqrt(1 + rot[0][0] - rot[1][1] - rot[2][2])
+            qx = 0.5*a
+            b = 0.5/a
+            qw = (rot[2][1] - rot[1][2])*b
+            qy = (rot[1][0] + rot[0][1])*b
+            qz = (rot[0][2] + rot[2][0])*b
+        elif rot[1][1] > rot[2][2]:
+            a = _sqrt(1 - rot[0][0] + rot[1][1] - rot[2][2])
+            qy = 0.5*a
+            b = 0.5/a
+            qw = (rot[0][2] - rot[2][0])*b
+            qx = (rot[1][0] + rot[0][1])*b
+            qz = (rot[2][1] + rot[1][2])*b
+        else:
+            a = _sqrt(1 - rot[0][0] - rot[1][1] + rot[2][2])
+            qz = 0.5*a
+            b = 0.5/a
+            qw = (rot[1][0] - rot[0][1])*b
+            qx = (rot[0][2] + rot[2][0])*b
+            qy = (rot[2][1] + rot[1][2])*b
+        cf.extpos.send_extpose(x, y, z, qx, qy, qz, qw)
     else:
         cf.extpos.send_extpos(x, y, z)
 
@@ -249,7 +270,7 @@ def check_battery(scf: SyncCrazyflie, min_voltage=4):
                 return
 
 
-def check_state(scf: SyncCrazyflie, min_voltage=4.0):
+def check_state(scf: SyncCrazyflie):
     print('Checking state.')
     log_config = LogConfig(name='State', period_in_ms=500)
     log_config.add_variable('stabilizer.roll', 'float')
@@ -265,9 +286,15 @@ def check_state(scf: SyncCrazyflie, min_voltage=4.0):
             yaw = log_data['stabilizer.yaw']
             print('Checking roll/pitch/yaw.')
 
-            for name, val in [('roll', roll), ('pitch', pitch), ('yaw', yaw)]:
+            #('yaw', yaw)
+            if SEND_FULL_POSE:
+                euler_checks = [('roll', roll, 5), ('pitch', pitch, 5)]
+            else:
+                euler_checks = [('roll', roll, 5), ('pitch', pitch, 5), ('yaw', yaw, 5)]
 
-                if np.abs(val) > 20:
+            for name, val, val_max in euler_checks:
+                print(name, val, val_max)
+                if np.abs(val) > val_max:
                     print('exceeded')
                     msg = "too much {:s}, {:10.4f} deg, for {:s}".format(
                         name, val, scf.cf.link_uri)
@@ -339,16 +366,23 @@ def activate_kalman_estimator(cf):
     cf.param.set_value('locSrv.extQuatStdDev', 0.06)
 
 def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1):
+    if tf_sec == 0:
+        return
     log_config = LogConfig(name='Roll', period_in_ms=int(dt_sec*1000.0))
     log_config.add_variable('stabilizer.roll', 'float')
+    log_config.add_variable('pm.vbat', 'float')
     t_sec = 0
     print('sleeping {:10.4f} seconds'.format(tf_sec))
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
             log_data = log_entry[1]
             roll = log_data['stabilizer.roll']
+            batt = log_data['pm.vbat']
             if np.abs(roll) > 60:
                 raise UnstableException("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
+            print("battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
+            if batt < 3.0:
+                raise LowBatteryException("low battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             t_sec += dt_sec
             if t_sec>tf_sec:
                 return
@@ -444,6 +478,10 @@ def takeoff_sequence(scf: SyncCrazyflie):
         kill_motor_sequence(scf)
         # raising here since we want to kill entire show if one fails early
         raise(e)
+    
+    except LowBatteryException as e:
+        print(e)
+        land_sequence(scf)
 
     except Exception as e:
         print(e)
@@ -490,6 +528,11 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
         # raise if you want flight to stop if one drone crashes
         #raise(e)
     
+    except LowBatteryException as e:
+        print(e)
+        # have this vehicle land
+        land_sequence(scf)
+    
     except Exception as e:
         print(e)
         land_sequence(scf)
@@ -515,6 +558,7 @@ def land_sequence(scf: Crazyflie):
         commander.stop()
     except Exception as e:
         print(e)
+        kill_motor_sequence(scf)
         raise(e)
 
 def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper, name):
