@@ -77,21 +77,28 @@ for i, order in enumerate(circle_order):
     points.append([radius*np.cos(theta), radius*np.sin(theta), 0])
 formCircle = scale_formation(np.array(points).T, form_scale)
 plot_formation(formCircle, 'circle')
-
-formCircleVert = formation.rotate_points_x(formCircle, np.pi/2)
-plot_formation(formCircleVert, 'circle_vert')
 # %%
 points = []
-triangle_oder = [5, 2, 8, 1, 4, 0, 3, 6, 7]
-for i_drone in triangle_oder:
-    theta = i_drone*2*np.pi/n_drones
-    if i_drone % 2 == 0:
-        points.append([0.5*np.cos(theta), 0.5*np.sin(theta), 0])
+line_order = []
+interval = 0.5
+shift = 4
+for i, order in enumerate(circle_order):
+    points.append([(i - shift) * interval, 0, 0])
+formLine = scale_formation(np.array(points).T, form_scale)
+plot_formation(formLine, 'line')
+# %%
+points = []
+for i in range(n_drones):
+    if i % 2 != 0:
+        point = np.array(formTakeoff[:,i] * np.sqrt(2)/2 + [0, 0, 0.5])
+        point = formation.rotate_points_z(point.T, np.pi/4)
+        points.append(point)
+    elif i == 4:
+        points.append(formTakeoff[:,i] + [0, 0, 1])
     else:
-        points.append([0.25*np.cos(theta), 0.25*np.sin(theta), 0])
-formTriangle = scale_formation(np.array(points).T, form_scale)
-plot_formation(formTriangle, 'triangle')
-
+        points.append(formTakeoff[:,i])
+formPyramid = scale_formation(np.array(points).T, form_scale)
+plot_formation(formPyramid, 'Pyramid')
 #%%
 class Geometry:
 
@@ -130,7 +137,7 @@ class Geometry:
 
     def spiral(self, form, z, n, duration, color):
         for t in np.linspace(0, 1, n):
-            rot_form = formation.rotate_points_z(form, t*2*np.pi)
+            rot_form = formation.rotate_points_z_h(form, t*2*np.pi)
             shift = np.array([[0, 0, z*np.sin(t)]]).T
             self.waypoints.append(rot_form + shift)
             self.T.append(duration/n)
@@ -140,16 +147,7 @@ class Geometry:
 
     def rotate_z(self, form, n, duration, color):
         for t in np.linspace(0, 1, n):
-            rot_form = formation.rotate_points_z(form, t*2*np.pi)
-            self.waypoints.append(rot_form)
-            self.T.append(duration/n)
-            self.colors.append(self.rgb[color])
-            n_drones = form.shape[1]
-            self.delays.append(np.zeros(n_drones).tolist())
-
-    def rotate_x(self, form, n, duration, color):
-        for t in np.linspace(0, 1, n):
-            rot_form = formation.rotate_points_x(form, t*2*np.pi)
+            rot_form = formation.rotate_points_z_h(form, t*2*np.pi)
             self.waypoints.append(rot_form)
             self.T.append(duration/n)
             self.colors.append(self.rgb[color])
@@ -187,27 +185,24 @@ class Geometry:
         data['repeat'] = 3
         assert len(trajectories) < 32
         return trajectories, data
-
+# %%
 # create trajectory waypoints
 g = Geometry()
-# g.sin_wave(form=formTakeoff, n=8, duration=16, color='red')
-g.goto(form=formCone, duration=2, color='blue')
-g.rotate_z(form=formCone, n=6, duration=12, color='green')
-g.goto(form=formTakeoff, duration=2, color='red')
-g.goto(form=formCircle, duration=2, color='gold')
-g.rotate_x(form=formCircle, n=4, duration=5, color='blue')
-# g.rotate(form=formTriangle, n=6, duration=12, color='red')
-# g.goto(form=formCircle, duration=2, color='blue')
-# g.spiral(form=formCircle, z=1, n=6, duration=12, color='green')
-# g.goto(formTakeoff, 2, color='blue')
-
-
+g.goto(form=formCircle, duration=2, color='blue')
+g.spiral(form=formCircle, duration=16, n=6, z=1, color='green')
+g.goto(form=formTakeoff, duration=2, color='green')
+g.goto(form=formLine, duration=2, color = 'red')
+g.sin_wave(form=formLine, n=8, duration=16, color = 'red')
+g.goto(form=formTakeoff, duration=2, color = 'red')
+g.goto(form=formPyramid, duration=2, color = 'gold')
+g.rotate_z(form=formPyramid, n=6, duration=16, color='gold')
+g.goto(formTakeoff, duration=2, color='blue')
 
 #%% plan trajectories
 trajectories, data = g.plan_trajectory()
 
-# with open('scripts/data/geometry.json', 'w') as f:
-#     json.dump(data, f)
+with open('scripts/data/geometry_9drone.json', 'w') as f:
+    json.dump(data, f)
 
 tgen.plot_trajectories(trajectories)
 tgen.animate_trajectories('geometry.mp4', trajectories, 1)
