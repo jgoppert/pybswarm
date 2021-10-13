@@ -28,33 +28,28 @@ if sys.version_info[0] != 3:
     exit()
 
 # Change uris and sequences according to your setup
-DRONE0 = 'radio://0/80/250K/E7E7E7E7E0'
-DRONE1 = 'radio://0/80/250K/E7E7E7E7E1'
-DRONE2 = 'radio://0/80/250K/E7E7E7E7E2'
+DRONES = [
+    'radio://0/80/250K/E7E7E7E7E0',
+    'radio://0/80/250K/E7E7E7E7E1',
+    'radio://0/80/250K/E7E7E7E7E2',
+    
+    'radio://0/90/250K/E7E7E7E7E3',
+    'radio://0/90/250K/E7E7E7E7E4',
+    'radio://0/90/250K/E7E7E7E7E5',
 
-DRONE3 = 'radio://0/90/250K/E7E7E7E7E3'
-DRONE4 = 'radio://0/90/250K/E7E7E7E7E4'
-DRONE5 = 'radio://0/90/250K/E7E7E7E7E5'
-
-# DRONE6 = 'radio://0/91/250K/E7E7E7E776'
-# DRONE7 = 'radio://0/91/250K/E7E7E7E777'
-# DRONE8 = 'radio://0/91/250K/E7E7E7E778'
+    # 'radio://0/91/250K/E7E7E7E776',
+    # 'radio://0/91/250K/E7E7E7E777',
+    # 'radio://0/91/250K/E7E7E7E778',
+]
 
 SEND_FULL_POSE = True
 
 
 def assignments(count):
-    one_drone = [DRONE0]
-    three_drone = [DRONE0, DRONE1, DRONE2]
-    six_drone = [DRONE0, DRONE1, DRONE2, DRONE3, DRONE4, DRONE5]
-    if count == 1:
-        uris = one_drone
-    elif count == 3:
-        uris = three_drone
-    elif count == 6:
-        uris = six_drone
-    else:
+    if count > len(DRONES) or count <= 0:
         raise ValueError('unknown number of drones')
+
+    uris = DRONES[:count]
     n_drones = len(uris)
 
     body_names = []
