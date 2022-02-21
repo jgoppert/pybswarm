@@ -31,7 +31,7 @@ if sys.version_info[0] != 3:
     exit()
 
 # Change uris and sequences according to your setup
-DRONE0 = 'radio://0/80/250K/E7E7E7E7E2'
+DRONE0 = 'radio://0/80/250K/E7E7E7E7E0'
 DRONE1 = 'radio://0/80/250K/E7E7E7E7E1'
 DRONE2 = 'radio://0/80/250K/E7E7E7E7E2'
 
