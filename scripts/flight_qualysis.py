@@ -1,3 +1,6 @@
+#!/usr/bin/env python3
+
+from os import kill
 import time
 import signal
 import sys
@@ -28,7 +31,7 @@ if sys.version_info[0] != 3:
     exit()
 
 # Change uris and sequences according to your setup
-DRONE0 = 'radio://0/80/250K/E7E7E7E7E0'
+DRONE0 = 'radio://0/80/250K/E7E7E7E7E2'
 DRONE1 = 'radio://0/80/250K/E7E7E7E7E1'
 DRONE2 = 'radio://0/80/250K/E7E7E7E7E2'
 
@@ -36,9 +39,9 @@ DRONE3 = 'radio://0/90/250K/E7E7E7E7E3'
 DRONE4 = 'radio://0/90/250K/E7E7E7E7E4'
 DRONE5 = 'radio://0/90/250K/E7E7E7E7E5'
 
-# DRONE6 = 'radio://0/91/250K/E7E7E7E776'
-# DRONE7 = 'radio://0/91/250K/E7E7E7E777'
-# DRONE8 = 'radio://0/91/250K/E7E7E7E778'
+DRONE6 = 'radio://0/100/250K/E7E7E7E7E6'
+DRONE7 = 'radio://0/100/250K/E7E7E7E7E7'
+DRONE8 = 'radio://0/100/250K/E7E7E7E7E8'
 
 SEND_FULL_POSE = True
 
@@ -47,12 +50,16 @@ def assignments(count):
     one_drone = [DRONE0]
     three_drone = [DRONE0, DRONE1, DRONE2]
     six_drone = [DRONE0, DRONE1, DRONE2, DRONE3, DRONE4, DRONE5]
+    nine_drone = [DRONE0, DRONE1, DRONE2, DRONE3, DRONE4, DRONE5,
+                    DRONE6, DRONE7, DRONE8]
     if count == 1:
         uris = one_drone
     elif count == 3:
         uris = three_drone
     elif count == 6:
         uris = six_drone
+    elif count == 9:
+        uris = nine_drone
     else:
         raise ValueError('unknown number of drones')
     n_drones = len(uris)
@@ -257,12 +264,12 @@ def check_battery(scf: SyncCrazyflie, min_voltage=4):
     print('Checking battery...')
     log_config = LogConfig(name='Battery', period_in_ms=500)
     log_config.add_variable('pm.vbat', 'float')
-
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
             log_data = log_entry[1]
             vbat = log_data['pm.vbat']
-            if log_data['pm.vbat'] < min_voltage:
+            print('battery voltage:', vbat)
+            if vbat < min_voltage:
                 msg = "battery too low: {:10.4f} V, for {:s}".format(
                     vbat, scf.cf.link_uri)
                 raise LowBatteryException(msg)
@@ -365,13 +372,16 @@ def activate_kalman_estimator(cf):
     # kalman filter. The default value seems to be a bit too low.
     cf.param.set_value('locSrv.extQuatStdDev', 0.06)
 
-def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1):
+def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1, check_low_battery=True):
     if tf_sec == 0:
         return
     log_config = LogConfig(name='Roll', period_in_ms=int(dt_sec*1000.0))
     log_config.add_variable('stabilizer.roll', 'float')
     log_config.add_variable('pm.vbat', 'float')
     t_sec = 0
+    batt_lowpass = 3.7
+    RC = 0.25 # time constant in seconds of first order low pass filter
+    alpha = dt_sec/(RC + dt_sec)
     print('sleeping {:10.4f} seconds'.format(tf_sec))
     with SyncLogger(scf, log_config) as logger:
         for log_entry in logger:
@@ -380,8 +390,9 @@ def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1):
             batt = log_data['pm.vbat']
             if np.abs(roll) > 60:
                 raise UnstableException("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
-            # print("battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
-            if batt < 3.0:
+            batt_lowpass = (1 - alpha)*batt_lowpass + alpha*batt
+            print("battery {:10.4f} V, for {:s}".format(batt_lowpass, scf.cf.link_uri))
+            if batt_lowpass < 2.9 and check_low_battery:
                 raise LowBatteryException("low battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             t_sec += dt_sec
             if t_sec>tf_sec:
@@ -471,7 +482,7 @@ def takeoff_sequence(scf: SyncCrazyflie):
         cf.param.set_value('ring.solidGreen', str(255))
         cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(1.5, 3.0)
-        sleep_while_checking_stable(scf, tf_sec=15)
+        sleep_while_checking_stable(scf, tf_sec=5)
 
     except UnstableException as e:
         print(e)
@@ -549,17 +560,23 @@ def land_sequence(scf: Crazyflie):
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
-        commander.land(0.0, 3.0)
+        commander.land(0.2, 5.0)
         print('Landing...')
-        sleep_while_checking_stable(scf, tf_sec=3)
+        sleep_while_checking_stable(scf, tf_sec=5, check_low_battery=False)
 
         # disable led to save battery
         cf.param.set_value('ring.effect', '0')
         commander.stop()
+        kill_motor_sequence(scf)
+
+    except UnstableException as e:
+        print(e)
+        kill_motor_sequence(scf)
+    
     except Exception as e:
         print(e)
         kill_motor_sequence(scf)
-        raise(e)
+
 
 def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper, name):
     """
@@ -583,15 +600,15 @@ def id_update(scf: SyncCrazyflie, id: List):
     
     # disable led to save battery
     cf.param.set_value('ring.effect', '0')
-    
+    t_sleep = 1 # seconds
     cf.param.set_value('activeMarker.front', str(id[0]))
-    time.sleep(1)
+    time.sleep(t_sleep)
     cf.param.set_value('activeMarker.back', str(id[1]))
-    time.sleep(1)
+    time.sleep(t_sleep)
     cf.param.set_value('activeMarker.left', str(id[2]))
-    time.sleep(1)
+    time.sleep(t_sleep)
     cf.param.set_value('activeMarker.right', str(id[3]))
-    time.sleep(1)
+    time.sleep(t_sleep)
     
     print('ID update done! |'+ scf._link_uri)
 
