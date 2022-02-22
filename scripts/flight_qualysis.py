@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import enum
 import time
 import signal
 import sys
@@ -21,8 +22,25 @@ import asyncio
 import math
 import xml.etree.cElementTree as ET
 from threading import Thread
+from enum import Enum
+import logging
 
 import qtm
+
+# set logging levels for crazyflie
+logger = logging.getLogger('flight_qualisys')
+logging.getLogger('qtm').setLevel(logging.ERROR)
+logging.getLogger('cflib.crazyflie.log').setLevel(logging.ERROR)
+logging.getLogger('cflib.crazyflie').setLevel(logging.ERROR)
+
+class FlightStage(Enum):
+    INIT=0
+    PREFLIGHT=1
+    UPLOAD=2
+    TAKEOFF=3
+    GO=4
+    LAND=5
+    ABORT=6
 
 if sys.version_info[0] != 3:
     print("This script requires Python 3")
@@ -30,7 +48,7 @@ if sys.version_info[0] != 3:
 
 # Change uris and sequences according to your setup
 DRONES = [
-    'radio://0/80/250K/E7E7E7E7E0',
+    'radio://0/90/250K/E7E7E7E7E3',
     'radio://0/80/250K/E7E7E7E7E1',
     'radio://0/80/250K/E7E7E7E7E2',
     
@@ -38,12 +56,13 @@ DRONES = [
     'radio://0/90/250K/E7E7E7E7E4',
     'radio://0/90/250K/E7E7E7E7E5',
 
-    # 'radio://0/91/250K/E7E7E7E776',
-    # 'radio://0/91/250K/E7E7E7E777',
-    # 'radio://0/91/250K/E7E7E7E778',
+    'radio://0/100/250K/E7E7E7E7E6',
+    'radio://0/100/250K/E7E7E7E7E7',
+    'radio://0/100/250K/E7E7E7E7E8',
 ]
 
 SEND_FULL_POSE = True
+
 
 
 def assignments(count):
@@ -54,25 +73,25 @@ def assignments(count):
     n_drones = len(uris)
 
     body_names = []
-    ids = [[1,3,4,2]]
+    led_id = [[1,3,4,2]]
     for i in range(n_drones):
         body_names.append('cf'+str(i))
         if i != 0:
-            ids.append([i*4 + j for j in ids[0]])
+            led_id.append([i*4 + j for j in led_id[0]])
 
-    print('Defined bodies are: ', body_names)
-    print('Deck ids are:', ids)
+    # print('Defined bodies are: ', body_names)
+    # print('Deck ids are:', led_id)
 
-    trajectory_assignment = {i: uris[i] for i in range(n_drones)}
-    print('Trajectory assignment is: ', trajectory_assignment)
-    id_assignment = {trajectory_assignment[i]: ids[i] for i in range(n_drones)}
-    rigid_bodies = {trajectory_assignment[i]: body_names[i] for i in range(n_drones)}
+    uri_to_traj_id = {uri: i for i, uri in enumerate(uris)}
+    uri_to_led_id = {uri: led_id[i] for i, uri in enumerate(uris)}
+    uri_to_rigid_body = {uri: body_names[i] for i, uri in enumerate(uris)}
     return {
-        'id_assignment': id_assignment,
-        'rigid_bodies': rigid_bodies,
-        'trajectory_assignment': trajectory_assignment,
+        'uris': uris,
+        'uri_to_traj_id': uri_to_traj_id,
+        'uri_to_rigid_body': uri_to_rigid_body,
+        'uri_to_led_id': uri_to_led_id,
         'n_drones': n_drones,
-        'body_names': body_names,
+        'body_names': body_names
     }
 
 
@@ -116,14 +135,12 @@ class QtmWrapper(Thread):
         # qtm_instance = await self._discover()
         # host = qtm_instance.host
         host = "192.168.1.2"
-        print('Connecting to QTM on ' + host)
+        logger.info('Connecting to QTM on %s', host)
         self.connection = await qtm.connect(host=host, version="1.20") # version 1.21 has weird 6DOF labels, so using 1.20 here
 
-        print(type(self.connection))
         params = await self.connection.get_parameters(parameters=['6d'])
         xml = ET.fromstring(params)
         self.qtm_6DoF_labels = [label.text for label in xml.iter('Name')]
-        print(self.qtm_6DoF_labels)
 
         await self.connection.stream_frames(
             components=['6D'],
@@ -148,9 +165,9 @@ class QtmWrapper(Thread):
 
         intersect = set(self.qtm_6DoF_labels).intersection(self.body_names) 
         if len(intersect) < len(self.body_names) :
-            print('Missing rigid bodies')
-            print('In QTM: ', self.qtm_6DoF_labels)
-            print('Intersection: ', intersect)
+            logger.error('Missing rigid bodies')
+            logger.error('In QTM: %s', str(self.qtm_6DoF_labels))
+            logger.error('Intersection: %s', str(intersect))
             return            
         else:
             for body_name in self.body_names:
@@ -170,7 +187,7 @@ class QtmWrapper(Thread):
                 if self.on_pose[body_name]:
                     # Make sure we got a position
                     if math.isnan(x):
-                        print("======= LOST RB TRACKING : " + body_name)
+                        logger.error("======= LOST RB TRACKING : %s", body_name)
                         continue
 
                     self.on_pose[body_name]([x, y, z, rot])
@@ -237,28 +254,26 @@ class Uploader:
         self.trajectory_mem = trajectory_mem
 
     def upload(self):
-        print('upload started')
+        logger.info('uploading')
         self.trajectory_mem.write_data(self._upload_done)
         while not self._is_done:
-            print('uploading...')
             time.sleep(1)
 
     def _upload_done(self, mem, addr):
-        print('upload is done')
+        logger.info('upload is done')
         self._is_done = True
         self.trajectory_mem.disconnect()
 
 
 def check_battery(scf: SyncCrazyflie, min_voltage=4):
-    print('Checking battery...')
+    logger.info('Checking battery...')
     log_config = LogConfig(name='Battery', period_in_ms=500)
     log_config.add_variable('pm.vbat', 'float')
 
-    with SyncLogger(scf, log_config) as logger:
-        for log_entry in logger:
+    with SyncLogger(scf, log_config) as sync_logger:
+        for log_entry in sync_logger:
             log_data = log_entry[1]
             vbat = log_data['pm.vbat']
-            print('battery voltage:', vbat)
             if vbat < min_voltage:
                 msg = "battery too low: {:10.4f} V, for {:s}".format(
                     vbat, scf.cf.link_uri)
@@ -268,20 +283,20 @@ def check_battery(scf: SyncCrazyflie, min_voltage=4):
 
 
 def check_state(scf: SyncCrazyflie):
-    print('Checking state.')
+    logger.info('Checking state.')
     log_config = LogConfig(name='State', period_in_ms=500)
     log_config.add_variable('stabilizer.roll', 'float')
     log_config.add_variable('stabilizer.pitch', 'float')
     log_config.add_variable('stabilizer.yaw', 'float')
-    print('Log configured.')
+    logger.info('Log configured.')
 
-    with SyncLogger(scf, log_config) as logger:
-        for log_entry in logger:
+    with SyncLogger(scf, log_config) as sync_logger:
+        for log_entry in sync_logger:
             log_data = log_entry[1]
             roll = log_data['stabilizer.roll']
             pitch = log_data['stabilizer.pitch']
             yaw = log_data['stabilizer.yaw']
-            print('Checking roll/pitch/yaw.')
+            logger.info('Checking roll/pitch/yaw.')
 
             #('yaw', yaw)
             if SEND_FULL_POSE:
@@ -290,20 +305,19 @@ def check_state(scf: SyncCrazyflie):
                 euler_checks = [('roll', roll, 5), ('pitch', pitch, 5), ('yaw', yaw, 5)]
 
             for name, val, val_max in euler_checks:
-                print(name, val, val_max)
                 if np.abs(val) > val_max:
-                    print('exceeded')
                     msg = "too much {:s}, {:10.4f} deg, for {:s}".format(
                         name, val, scf.cf.link_uri)
-                    print(msg)
+                    logger.info(msg)
                     raise UnstableException(msg)
             return
 
 
 def wait_for_position_estimator(scf: SyncCrazyflie):
-    print('Waiting for estimator to find position...',)
+    logger.info('Waiting for estimator to find position...')
 
-    log_config = LogConfig(name='Kalman Variance', period_in_ms=500)
+    dt = 0.5
+    log_config = LogConfig(name='Kalman Variance', period_in_ms=dt*1000)
     log_config.add_variable('kalman.varPX', 'float')
     log_config.add_variable('kalman.varPY', 'float')
     log_config.add_variable('kalman.varPZ', 'float')
@@ -313,9 +327,10 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
     var_z_history = [1000] * 10
 
     threshold = 0.001
+    t = 0
 
-    with SyncLogger(scf.cf, log_config) as logger:
-        for log_entry in logger:
+    with SyncLogger(scf.cf, log_config) as sync_logger:
+        for log_entry in sync_logger:
             log_data = log_entry[1]
 
             var_x_history.append(log_data['kalman.varPX'])
@@ -337,18 +352,20 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
                     max_z - min_z) < threshold:
                 break
             else:
-                print("{:s}\t{:10g}\t{:10g}\t{:10g}".
+                if t > 10:
+                    raise Exception("estimator failed: {:s}\t{:10g}\t{:10g}\t{:10g}".
                       format(scf.cf.link_uri, max_x - min_x, max_y - min_y, max_z - min_z))
+            t += dt
 
 
 def wait_for_param_download(scf: SyncCrazyflie):
     while not scf.cf.param.is_updated:
         time.sleep(1.0)
-    print('Parameters downloaded for', scf.cf.link_uri)
+    logger.info('Parameters downloaded for %s', scf.cf.link_uri)
 
 
 def reset_estimator(scf: SyncCrazyflie):
-    print('Resetting estimator...')
+    logger.info('Resetting estimator...')
     cf = scf.cf
     cf.param.set_value('kalman.resetEstimation', '1')
     time.sleep(0.1)
@@ -372,16 +389,16 @@ def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1, check_lo
     batt_lowpass = 3.7
     RC = 0.25 # time constant in seconds of first order low pass filter
     alpha = dt_sec/(RC + dt_sec)
-    print('sleeping {:10.4f} seconds'.format(tf_sec))
-    with SyncLogger(scf, log_config) as logger:
-        for log_entry in logger:
+    # print('sleeping {:10.4f} seconds'.format(tf_sec))
+    with SyncLogger(scf, log_config) as sync_logger:
+        for log_entry in sync_logger:
             log_data = log_entry[1]
             roll = log_data['stabilizer.roll']
             batt = log_data['pm.vbat']
             if np.abs(roll) > 60:
                 raise UnstableException("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
             batt_lowpass = (1 - alpha)*batt_lowpass + alpha*batt
-            print("battery {:10.4f} V, for {:s}".format(batt_lowpass, scf.cf.link_uri))
+            #print("battery {:10.4f} V, for {:s}".format(batt_lowpass, scf.cf.link_uri))
             if batt_lowpass < 2.9 and check_low_battery:
                 raise LowBatteryException("low battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             t_sec += dt_sec
@@ -390,13 +407,14 @@ def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1, check_lo
 
 
 def upload_trajectory(scf: SyncCrazyflie, data: Dict):
+    logger.info('uploading trajectory at flight stage: %s', data['flight_stage'])
+
     cf = scf.cf  # type: Crazyflie
 
-    print('Starting upload')
     trajectory_mem = scf.cf.mem.get_mems(MemoryElement.TYPE_TRAJ)[0]
 
     TRAJECTORY_MAX_LENGTH = 31
-    trajectory = data['trajectory']
+    trajectory = data['traj']['trajectory']
 
     if len(trajectory) > TRAJECTORY_MAX_LENGTH:
         raise ValueError("Trajectory too long for drone {:s}".format(cf.link_uri))
@@ -409,18 +427,23 @@ def upload_trajectory(scf: SyncCrazyflie, data: Dict):
         yaw = Poly4D.Poly(row[25:33])
         trajectory_mem.poly4Ds.append(Poly4D(duration, x, y, z, yaw))
 
-    print('Calling upload method')
+    logger.info('Calling upload method')
     uploader = Uploader(trajectory_mem)
     uploader.upload()
     
-    print('Defining trajectory.')
+    logger.info('Defining trajectory.')
     cf.high_level_commander.define_trajectory(
         trajectory_id=1, offset=0, n_pieces=len(trajectory_mem.poly4Ds))
 
-def preflight_sequence(scf: SyncCrazyflie):
+    data['flight_stage'] = FlightStage.UPLOAD
+
+
+def preflight_sequence(scf: SyncCrazyflie, data: Dict):
     """
     This is the preflight sequence. It calls all other subroutines before takeoff.
     """
+    logger.info('preflight at flight stage: %s', data['flight_stage'])
+
     cf = scf.cf  # type: Crazyflie
 
     # switch to Kalman filter
@@ -440,9 +463,6 @@ def preflight_sequence(scf: SyncCrazyflie):
     # ensure params are downloaded
     wait_for_param_download(scf)
 
-    # make sure not already flying
-    # land_sequence(scf)
-
     cf.param.set_value('ring.effect', '0')
 
     # set pid gains, tune down Kp to smooth trajectories
@@ -459,10 +479,15 @@ def preflight_sequence(scf: SyncCrazyflie):
     # check state
     check_state(scf)
 
-def takeoff_sequence(scf: SyncCrazyflie):
+    data['flight_stage'] = FlightStage.PREFLIGHT
+
+
+def takeoff_sequence(scf: SyncCrazyflie, data: Dict):
     """
     This is the takeoff sequence. It commands takeoff.
     """
+    logger.info('takeoff at flight stage: %s', data['flight_stage'])
+
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
@@ -475,25 +500,28 @@ def takeoff_sequence(scf: SyncCrazyflie):
         sleep_while_checking_stable(scf, tf_sec=5)
 
     except UnstableException as e:
-        print(e)
-        kill_motor_sequence(scf)
+        logger.error('unstable exception: %s', e)
+        kill_motor_sequence(scf, data)
         # raising here since we want to kill entire show if one fails early
         raise(e)
     
     except LowBatteryException as e:
-        print(e)
-        land_sequence(scf)
+        logger.error('low battery exception: %s', e)
+        land_sequence(scf, data)
 
     except Exception as e:
-        print(e)
-        land_sequence(scf)
+        logger.error('general exception: %s', e)
+        land_sequence(scf, data)
         raise(e)
+
+    data['flight_stage'] = FlightStage.TAKEOFF
 
 
 def go_sequence(scf: SyncCrazyflie, data: Dict):
     """
     This is the go sequence. It commands the trajectory to start.
     """
+    logger.info('go at flight stage: %s', data['flight_stage'])
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
@@ -509,7 +537,8 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
         cf.param.set_value('ring.solidBlue', str(0))
         time.sleep(0.1)
 
-        for color, delay, T in zip(data['color'], data['delay'], data['T']):
+        traj = data['traj']
+        for color, delay, T in zip(traj['color'], traj['delay'], traj['T']):
             # change led color
             red = int(intensity * color[0])
             green = int(intensity * color[1])
@@ -524,60 +553,76 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
             sleep_while_checking_stable(scf, tf_sec=T - delay)
         
     except UnstableException as e:
-        print(e)
-        kill_motor_sequence(scf)
+        logger.error('go general exceptoin: %s', e)
+        kill_motor_sequence(scf, data)
         # raise if you want flight to stop if one drone crashes
         #raise(e)
     
     except LowBatteryException as e:
-        print(e)
+        logger.error('go low battery exception: %s', e)
         # have this vehicle land
-        land_sequence(scf)
+        land_sequence(scf, data)
     
     except Exception as e:
-        print(e)
-        land_sequence(scf)
+        logger.error('go general exception: %s', e)
+        land_sequence(scf, data)
         # raising here since we don't know what this exception is
         raise(e)
 
+    data['flight_stage'] = FlightStage.GO
 
-def kill_motor_sequence(scf: Crazyflie):
+
+def kill_motor_sequence(scf: Crazyflie, data: Dict):
+    logger.info('kiling motors at flight stage: %s', data['flight_stage'])
     cf = scf.cf
     cf.param.set_value('commander.enHighLevel', '0')
     cf.param.set_value('motorPowerSet.enable', '1')
+    data['flight_stage'] = FlightStage.ABORT
 
-def land_sequence(scf: Crazyflie):
+
+def land_sequence(scf: Crazyflie, data: Dict):
+    logger.info('landing at flight stage: %s', data['flight_stage'])
+    flight_stage = data['flight_stage']
+    if flight_stage == FlightStage.ABORT or \
+        flight_stage == FlightStage.LAND or \
+            flight_stage.value < FlightStage.TAKEOFF.value:
+        kill_motor_sequence(scf, data)
+        logger.error('land called, but not flying, killing motors')
+        return
+    
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
         commander.land(0.2, 5.0)
-        print('Landing...')
+        logger.info('Landing...')
         sleep_while_checking_stable(scf, tf_sec=5, check_low_battery=False)
 
         # disable led to save battery
         cf.param.set_value('ring.effect', '0')
         commander.stop()
-        kill_motor_sequence(scf)
+        kill_motor_sequence(scf, data)
 
     except UnstableException as e:
-        print(e)
-        kill_motor_sequence(scf)
+        logger.error('land unstable exception: %s', e)
+        kill_motor_sequence(scf, data)
     
     except Exception as e:
-        print(e)
-        kill_motor_sequence(scf)
+        logger.error('land general exception: %s', e)
+        kill_motor_sequence(scf, data)
+
+    data['flight_stage'] = FlightStage.LAND
 
 
-def send6DOF(scf: SyncCrazyflie, qtmWrapper: QtmWrapper, name):
+def send6DOF(scf: SyncCrazyflie, data: Dict):
     """
     This relays mocap data to each crazyflie
     """
     try:
-        qtmWrapper.on_pose[name] = lambda pose: send_extpose_rot_matrix(scf, pose[0], pose[1], pose[2], pose[3])
+        data['qtmWrapper'].on_pose[data['rigid_body']] = lambda pose: send_extpose_rot_matrix(scf, pose[0], pose[1], pose[2], pose[3])
     except Exception as e:
-        print(e)
-        print('Could not relay mocap data')
-        land_sequence(scf)
+        logger.error('send6DOF general exception: %s', e)
+        logger.error('Could not relay mocap data')
+        land_sequence(scf, data)
 
 def id_update(scf: SyncCrazyflie, id: List):
     cf = scf.cf
@@ -600,132 +645,121 @@ def id_update(scf: SyncCrazyflie, id: List):
     cf.param.set_value('activeMarker.right', str(id[3]))
     time.sleep(t_sleep)
     
-    print('ID update done! |'+ scf._link_uri)
+    logger.info('ID update done! | %s', scf._link_uri)
 
 def swarm_id_update(args):
     cflib.crtp.init_drivers(enable_debug_driver=False)
-
-    data = assignments(int(args.count))
-    trajectory_assignment = data['trajectory_assignment']
-    body_names = data['body_names']
-    rigid_bodies = data['rigid_bodies']
-    id_assignment = data['id_assignment']
-
+    assign = assignments(int(args.count))
     factory = CachedCfFactory(rw_cache='./cache')
-    uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
-    id_args = {key: [id_assignment[key]] for key in id_assignment.keys()}
-    with Swarm(uris, factory=factory) as swarm:
-        print('Starting ID update...')
-        #swarm.sequential(id_update, id_args) # parallel update has some issue with more than 3 drones, using sequential update here.
-        swarm.sequential(id_update, id_args) # parallel update has some issue with more than 3 drones, using sequential update here.
+    swarm_args = {
+        uri: [assign['uri_to_led_id'][uri]]
+        for uri in assign['uris']
+    }
+
+    with Swarm(assign['uris'], factory=factory) as swarm:
+        logger.info('Starting ID update...')
+        swarm.sequential(id_update, swarm_args) # parallel update has some issue with more than 3 drones, using sequential update here.
 
 def hover(args):
     cflib.crtp.init_drivers(enable_debug_driver=False)
-
-    data = assignments(int(args.count))
-    trajectory_assignment = data['trajectory_assignment']
-    body_names = data['body_names']
-    rigid_bodies = data['rigid_bodies']
-
+    assign = assignments(int(args.count))
     factory = CachedCfFactory(rw_cache='./cache')
-    uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
+    qtmWrapper = QtmWrapper(assign['body_names'])
+    swarm_args = {}
+    for uri in assign['uris']:
+        swarm_args[uri] = [{
+            'qtmWrapper': qtmWrapper,
+            'rigid_body': assign['uri_to_rigid_body'][uri],
+            'flight_stage': FlightStage.INIT
+        }]
 
-    qtmWrapper = QtmWrapper(body_names)
-    qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
-
-    with Swarm(uris, factory=factory) as swarm:
+    with Swarm(assign['uris'], factory=factory) as swarm:
         
         def signal_handler(sig, frame):
-            print('You pressed Ctrl+C!')
-            swarm.parallel(land_sequence)
+            logger.debug('You pressed Ctrl+C!')
+            swarm.parallel_safe(land_sequence, swarm_args)
             time.sleep(1)
-            print('Closing QTM link...')
+            logger.info('Closing QTM link...')
             qtmWrapper.close()
             sys.exit(0)
 
         signal.signal(signal.SIGINT, signal_handler)
-        print('Press Ctrl+C to land.')
+        logger.info('Press Ctrl+C to land.')
     
-        print('Starting mocap data relay...')
-        swarm.parallel_safe(send6DOF, qtm_args)
+        logger.info('Starting mocap data relay...')
+        swarm.parallel_safe(send6DOF, swarm_args)
 
-        print('Preflight sequence...')
-        swarm.parallel_safe(preflight_sequence)
+        logger.info('Preflight sequence...')
+        swarm.parallel_safe(preflight_sequence, swarm_args)
 
-        print('Takeoff sequence...')
-        swarm.parallel_safe(takeoff_sequence)
+        logger.info('Takeoff sequence...')
+        swarm.parallel_safe(takeoff_sequence, swarm_args)
 
-        print('Land sequence...')
-        swarm.parallel(land_sequence)
+        logger.info('Land sequence...')
+        swarm.parallel_safe(land_sequence, swarm_args)
 
-    print('Closing QTM connection...')
+    logger.info('Closing QTM connection...')
     qtmWrapper.close()
 
 def run(args):
-    data = assignments(int(args.count))
-    trajectory_assignment = data['trajectory_assignment']
-    body_names = data['body_names']
-    rigid_bodies = data['rigid_bodies']
-
+    assign = assignments(int(args.count))
     cflib.crtp.init_drivers(enable_debug_driver=False)
-
     factory = CachedCfFactory(rw_cache='./cache')
-    uris = {trajectory_assignment[key] for key in trajectory_assignment.keys()}
-    print(uris)
-    
     with open(args.json, 'r') as f:
-        data = json.load(f)
-    swarm_args = {trajectory_assignment[drone_pos]: [data[str(drone_pos)]]
-        for drone_pos in trajectory_assignment.keys()}
+        traj_data = json.load(f)
+    qtmWrapper = QtmWrapper(assign['body_names'])
+    swarm_args = {}
+    for uri in assign['uris']:
+        swarm_args[uri] = [{
+            'qtmWrapper': qtmWrapper,
+            'rigid_body': assign['uri_to_rigid_body'][uri],
+            'flight_stage': FlightStage.INIT,
+            'traj': traj_data[str(assign['uri_to_traj_id'][uri])]
+        }]
 
-    qtmWrapper = QtmWrapper(body_names)
-    qtm_args = {key: [qtmWrapper, rigid_bodies[key]] for key in rigid_bodies.keys()}
-
-    with Swarm(uris, factory=factory) as swarm:
+    with Swarm(assign['uris'], factory=factory) as swarm:
         
         def signal_handler(sig, frame):
-            print('You pressed Ctrl+C!')
-            swarm.parallel(land_sequence)
+            # TODO: Handle estimator not converging
+            logger.info('You pressed Ctrl+C!')
+            swarm.parallel_safe(land_sequence, swarm_args)
             time.sleep(1)
-            print('Closing QTM link')
+            logger.info('Closing QTM link')
             qtmWrapper.close()
             sys.exit(0)
 
         signal.signal(signal.SIGINT, signal_handler)
-        print('Press Ctrl+C to land.')
+        logger.info('Press Ctrl+C to land.')
     
         try:
-            print('Starting mocap data relay...')
-            swarm.parallel_safe(send6DOF, qtm_args)
+            logger.info('Starting mocap data relay...')
+            swarm.parallel_safe(send6DOF, swarm_args)
 
-            print('Preflight sequence...')
-            swarm.parallel_safe(preflight_sequence)
+            logger.info('Preflight sequence...')
+            swarm.parallel_safe(preflight_sequence, swarm_args)
                 
-            print('Takeoff sequence...')
-            swarm.parallel_safe(takeoff_sequence)
+            logger.info('Upload sequence...')
+            swarm.parallel_safe(upload_trajectory, swarm_args)
 
-            print('Upload sequence...')
-            trajectory_count = 0
+            logger.info('Takeoff sequence...')
+            swarm.parallel_safe(takeoff_sequence, swarm_args)
 
             # repeat = int(data['repeat'])
+            repeat = 1
+            for trajectory_count in range(repeat):
+                logger.info('Go sequence...')
+                swarm.parallel_safe(go_sequence, swarm_args)
 
-            for trajectory_count in range(1):
-                if trajectory_count == 0:
-                    print('Uploading Trajectory')
-                    swarm.parallel(upload_trajectory, args_dict=swarm_args)
-
-                print('Go...')
-                swarm.parallel_safe(go_sequence, args_dict=swarm_args)
-            print('Land sequence...')
-            swarm.parallel(land_sequence)
+            logger.info('Land sequence...')
+            swarm.parallel_safe(land_sequence, swarm_args)
 
         except Exception as e:
-            print(e)
-            print('Aborting go sequence, landing')
-            swarm.parallel(land_sequence)
+            logger.error('general exception: %s', e)
+            logger.error('Aborting go sequence, landing')
+            swarm.parallel_safe(land_sequence, swarm_args)
 
 
-    print('Closing QTM connection...')
+    logger.info('Closing QTM connection...')
     qtmWrapper.close()
 
 if __name__ == "__main__":
@@ -743,4 +777,4 @@ if __name__ == "__main__":
     elif args.mode == 'hover':
         hover(args)
     else:
-        print('Not a valid input!!!')
+        logger.error('Not a valid input!!!')
