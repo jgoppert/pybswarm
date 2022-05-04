@@ -1,7 +1,8 @@
 #%%
 import sys
 import os
-sys.path.insert(0, os.getcwd())
+sys.path.insert(0, os.curdir)
+sys.path.insert(0, os.pardir)
 
 from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
@@ -171,11 +172,11 @@ g.goto(formTakeoff, 2, color='blue')
 #%% plan trajectories
 trajectories, data = g.plan_trajectory()
 
-with open('scripts/data/geometry.json', 'w') as f:
+with open('data/geometry.json', 'w') as f:
     json.dump(data, f)
 
 tgen.plot_trajectories(trajectories)
-# tgen.animate_trajectories('geometry.mp4', trajectories, 1)
+tgen.animate_trajectories('geometry.mp4', trajectories, 1)
 
 #%%
 plt.figure()
@@ -194,6 +195,3 @@ plt.figure()
 plt.title('durations')
 plt.bar(range(len(g.T)), g.T)
 plt.show()
-
-
-#%%

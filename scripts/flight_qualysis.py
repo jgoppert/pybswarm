@@ -29,9 +29,9 @@ import qtm
 
 # set logging levels for crazyflie
 logger = logging.getLogger('flight_qualisys')
-logging.getLogger('qtm').setLevel(logging.ERROR)
-logging.getLogger('cflib.crazyflie.log').setLevel(logging.ERROR)
-logging.getLogger('cflib.crazyflie').setLevel(logging.ERROR)
+logging.getLogger('qtm').setLevel(logging.WARN)
+logging.getLogger('cflib.crazyflie.log').setLevel(logging.WARN)
+logging.getLogger('cflib.crazyflie').setLevel(logging.INFO)
 
 class FlightStage(Enum):
     INIT=0
@@ -48,17 +48,18 @@ if sys.version_info[0] != 3:
 
 # Change uris and sequences according to your setup
 DRONES = [
-    'radio://0/90/250K/E7E7E7E7E3',
-    'radio://0/80/250K/E7E7E7E7E1',
+    # 'radio:2/0/100/250K/E7E7E7E7E8', # uncomment and change uri to test individual drones
+    'radio://0/0/250K/E7E7E7E7E0',
+    'radio://0/40/250K/E7E7E7E7E1',
     'radio://0/80/250K/E7E7E7E7E2',
-    
-    'radio://0/90/250K/E7E7E7E7E3',
-    'radio://0/90/250K/E7E7E7E7E4',
-    'radio://0/90/250K/E7E7E7E7E5',
 
-    'radio://0/100/250K/E7E7E7E7E6',
-    'radio://0/100/250K/E7E7E7E7E7',
-    'radio://0/100/250K/E7E7E7E7E8',
+    'radio://0/0/250K/E7E7E7E7E3',
+    'radio://0/40/250K/E7E7E7E7E4',
+    'radio://0/80/250K/E7E7E7E7E5',
+
+    'radio://0/0/250K/E7E7E7E7E6',
+    'radio://0/40/250K/E7E7E7E7E7',
+    'radio://0/80/250K/E7E7E7E7E8',
 ]
 
 SEND_FULL_POSE = True
@@ -145,6 +146,8 @@ class QtmWrapper(Thread):
         await self.connection.stream_frames(
             components=['6D'],
             on_packet=self._on_packet)
+        logger.info('Connected to QTM')
+
 
     async def _discover(self):
         async for qtm_instance in qtm.Discover('0.0.0.0'):
@@ -313,7 +316,7 @@ def check_state(scf: SyncCrazyflie):
             return
 
 
-def wait_for_position_estimator(scf: SyncCrazyflie):
+def wait_for_position_estimator(scf: SyncCrazyflie, duration: float = 10.0):
     logger.info('Waiting for estimator to find position...')
 
     dt = 0.5
@@ -352,9 +355,9 @@ def wait_for_position_estimator(scf: SyncCrazyflie):
                     max_z - min_z) < threshold:
                 break
             else:
-                if t > 10:
-                    raise Exception("estimator failed: {:s}\t{:10g}\t{:10g}\t{:10g}".
-                      format(scf.cf.link_uri, max_x - min_x, max_y - min_y, max_z - min_z))
+                if t > duration:
+                    raise Exception("estimator failed after {} seconds: {:s}\t{:10g}\t{:10g}\t{:10g}".
+                      format(duration, scf.cf.link_uri, max_x - min_x, max_y - min_y, max_z - min_z))
             t += dt
 
 
@@ -370,7 +373,7 @@ def reset_estimator(scf: SyncCrazyflie):
     cf.param.set_value('kalman.resetEstimation', '1')
     time.sleep(0.1)
     cf.param.set_value('kalman.resetEstimation', '0')
-    wait_for_position_estimator(scf)
+    wait_for_position_estimator(scf, 10)
 
 def activate_kalman_estimator(cf):
     cf.param.set_value('stabilizer.estimator', '2')
@@ -398,7 +401,7 @@ def sleep_while_checking_stable(scf: SyncCrazyflie, tf_sec, dt_sec=0.1, check_lo
             if np.abs(roll) > 60:
                 raise UnstableException("flip detected {:10.4f} deg, for {:s}".format(roll, scf.cf.link_uri))
             batt_lowpass = (1 - alpha)*batt_lowpass + alpha*batt
-            #print("battery {:10.4f} V, for {:s}".format(batt_lowpass, scf.cf.link_uri))
+            # print("battery {:10.4f} V, for {:s}".format(batt_lowpass, scf.cf.link_uri))
             if batt_lowpass < 2.9 and check_low_battery:
                 raise LowBatteryException("low battery {:10.4f} V, for {:s}".format(batt, scf.cf.link_uri))
             t_sec += dt_sec
@@ -507,11 +510,11 @@ def takeoff_sequence(scf: SyncCrazyflie, data: Dict):
     
     except LowBatteryException as e:
         logger.error('low battery exception: %s', e)
-        land_sequence(scf, data)
+        kill_motor_sequence(scf, data)
 
     except Exception as e:
         logger.error('general exception: %s', e)
-        land_sequence(scf, data)
+        kill_motor_sequence(scf, data)
         raise(e)
 
     data['flight_stage'] = FlightStage.TAKEOFF
@@ -522,6 +525,8 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
     This is the go sequence. It commands the trajectory to start.
     """
     logger.info('go at flight stage: %s', data['flight_stage'])
+    data['flight_stage'] = FlightStage.TAKEOFF
+
     try:
         cf = scf.cf  # type: Crazyflie
         commander = cf.high_level_commander  # type: cflib.HighLevelCOmmander
@@ -569,11 +574,9 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
         # raising here since we don't know what this exception is
         raise(e)
 
-    data['flight_stage'] = FlightStage.GO
-
 
 def kill_motor_sequence(scf: Crazyflie, data: Dict):
-    logger.info('kiling motors at flight stage: %s', data['flight_stage'])
+    logger.info('killing motors at flight stage: %s', data['flight_stage'])
     cf = scf.cf
     cf.param.set_value('commander.enHighLevel', '0')
     cf.param.set_value('motorPowerSet.enable', '1')
@@ -658,7 +661,7 @@ def swarm_id_update(args):
 
     with Swarm(assign['uris'], factory=factory) as swarm:
         logger.info('Starting ID update...')
-        swarm.sequential(id_update, swarm_args) # parallel update has some issue with more than 3 drones, using sequential update here.
+        swarm.parallel_safe(id_update, swarm_args) # parallel update has some issue with more than 3 drones, using sequential update here.
 
 def hover(args):
     cflib.crtp.init_drivers(enable_debug_driver=False)
@@ -674,6 +677,8 @@ def hover(args):
         }]
 
     with Swarm(assign['uris'], factory=factory) as swarm:
+
+        logger.info('swarm links created')
         
         def signal_handler(sig, frame):
             logger.debug('You pressed Ctrl+C!')
