@@ -360,8 +360,11 @@ def animate_trajectories(filename, trajectories, fps):
     def update_lines(num, dataLines, lines):
         for line, data in zip(lines, dataLines):
             # NOTE: there is no .set_data() for 3 dim data...
-            line.set_data(data[0:2, num * step])
-            line.set_3d_properties(data[2, num * step])
+            line.set_data([
+                [data[0, num * step]],
+                [data[1, num * step]],
+            ])
+            line.set_3d_properties([data[2, num * step]])
         return lines
 
     border = 0.1
