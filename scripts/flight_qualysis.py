@@ -47,6 +47,8 @@ if sys.version_info[0] != 3:
 
 # Change uris and sequences according to your setup
 DRONES = [
+    'radio://2/80/250K/E7E7E7E7E8',
+
     'radio://0/0/250K/E7E7E7E7E0',
     'radio://1/40/250K/E7E7E7E7E1',
     'radio://2/80/250K/E7E7E7E7E2',
@@ -57,7 +59,6 @@ DRONES = [
 
     'radio://0/0/250K/E7E7E7E7E6',
     'radio://1/40/250K/E7E7E7E7E7',
-    'radio://2/80/250K/E7E7E7E7E8',
 ]
 
 SEND_FULL_POSE = True
@@ -509,7 +510,7 @@ def takeoff_sequence(scf: SyncCrazyflie, data: Dict):
         cf.param.set_value('ring.solidGreen', str(255))
         cf.param.set_value('ring.solidBlue', str(0))
         commander.takeoff(1.5, 3.0)
-        sleep_while_checking_stable(scf, tf_sec=5)
+        sleep_while_checking_stable(scf, tf_sec=10)
 
     except UnstableException as e:
         logger.error('%s unstable exception: %s', scf.cf.link_uri, e)
@@ -542,7 +543,7 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
         commander.start_trajectory(
             trajectory_id=1, time_scale=1.0, relative=False)
 
-        intensity = 0  # 0-1
+        intensity = 1  # 0-1
 
         # initial led color
         cf.param.set_value('ring.effect', '7')
@@ -615,11 +616,11 @@ def land_sequence(scf: Crazyflie, data: Dict):
         kill_motor_sequence(scf, data)
 
     except UnstableException as e:
-        logger.error('land unstable exception: %s', e)
+        logger.error('%s land unstable exception: %s', scf.cf.link_uri, e)
         kill_motor_sequence(scf, data)
     
     except Exception as e:
-        logger.error('land general exception: %s', e)
+        logger.error('%s land general exception: %s', scf.cf.link_uri, e)
         kill_motor_sequence(scf, data)
 
     data['flight_stage'] = FlightStage.LAND
@@ -697,17 +698,16 @@ def hover(args):
             swarm.parallel_safe(preflight_sequence, swarm_args)
 
             logger.info('Takeoff sequence...')
-            swarm.parallel_safe(takeoff_sequence, swarm_args)
-
+            swarm.parallel(takeoff_sequence, swarm_args)
+            
         except KeyboardInterrupt:
-            swarm.parallel_safe(land_sequence, swarm_args)
+            pass
 
         except Exception as e:
-            swarm.parallel_safe(land_sequence, swarm_args)
             print(e)
 
         logger.info('Land sequence...')
-        swarm.parallel_safe(land_sequence, swarm_args)
+        swarm.parallel(land_sequence, swarm_args)
         
     logger.info('Closing QTM connection...')
     qtmWrapper.close()
@@ -741,22 +741,22 @@ def run(args):
             swarm.parallel_safe(upload_trajectory, swarm_args)
                 
             logger.info('Takeoff sequence...')
-            swarm.parallel_safe(takeoff_sequence, swarm_args)
+            swarm.parallel(takeoff_sequence, swarm_args)
 
             # repeat = int(data['repeat'])
             repeat = 1
             for trajectory_count in range(repeat):
                 logger.info('Go sequence...')
-                swarm.parallel_safe(go_sequence, swarm_args)
+                swarm.parallel(go_sequence, swarm_args)
 
         except KeyboardInterrupt:
-            swarm.parallel_safe(land_sequence, swarm_args)
+            pass
 
         except Exception as e:
             logger.error('swarm general exception: %s', e)
 
         logger.info('Land sequence...')
-        swarm.parallel_safe(land_sequence, swarm_args)
+        swarm.parallel(land_sequence, swarm_args)
 
     logger.info('Closing QTM connection...')
     qtmWrapper.close()
