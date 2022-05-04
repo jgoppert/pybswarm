@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import enum
 import time
-import signal
 import sys
 import json
 import argparse
@@ -48,18 +47,17 @@ if sys.version_info[0] != 3:
 
 # Change uris and sequences according to your setup
 DRONES = [
-    # 'radio:2/0/100/250K/E7E7E7E7E8', # uncomment and change uri to test individual drones
     'radio://0/0/250K/E7E7E7E7E0',
-    'radio://0/40/250K/E7E7E7E7E1',
-    'radio://0/80/250K/E7E7E7E7E2',
+    'radio://1/40/250K/E7E7E7E7E1',
+    'radio://2/80/250K/E7E7E7E7E2',
 
     'radio://0/0/250K/E7E7E7E7E3',
-    'radio://0/40/250K/E7E7E7E7E4',
-    'radio://0/80/250K/E7E7E7E7E5',
+    'radio://1/40/250K/E7E7E7E7E4',
+    'radio://2/80/250K/E7E7E7E7E5',
 
     'radio://0/0/250K/E7E7E7E7E6',
-    'radio://0/40/250K/E7E7E7E7E7',
-    'radio://0/80/250K/E7E7E7E7E8',
+    'radio://1/40/250K/E7E7E7E7E7',
+    'radio://2/80/250K/E7E7E7E7E8',
 ]
 
 SEND_FULL_POSE = True
@@ -533,7 +531,7 @@ def go_sequence(scf: SyncCrazyflie, data: Dict):
         commander.start_trajectory(
             trajectory_id=1, time_scale=1.0, relative=False)
 
-        intensity = 1  # 0-1
+        intensity = 0  # 0-1
 
         # initial led color
         cf.param.set_value('ring.effect', '7')
@@ -680,29 +678,26 @@ def hover(args):
 
         logger.info('swarm links created')
         
-        def signal_handler(sig, frame):
-            logger.debug('You pressed Ctrl+C!')
-            swarm.parallel_safe(land_sequence, swarm_args)
-            time.sleep(1)
-            logger.info('Closing QTM link...')
-            qtmWrapper.close()
-            sys.exit(0)
+        try:
+            logger.info('Starting mocap data relay...')
+            swarm.parallel_safe(send6DOF, swarm_args)
 
-        signal.signal(signal.SIGINT, signal_handler)
-        logger.info('Press Ctrl+C to land.')
-    
-        logger.info('Starting mocap data relay...')
-        swarm.parallel_safe(send6DOF, swarm_args)
+            logger.info('Preflight sequence...')
+            swarm.parallel_safe(preflight_sequence, swarm_args)
 
-        logger.info('Preflight sequence...')
-        swarm.parallel_safe(preflight_sequence, swarm_args)
+            logger.info('Takeoff sequence...')
+            swarm.parallel_safe(takeoff_sequence, swarm_args)
 
-        logger.info('Takeoff sequence...')
-        swarm.parallel_safe(takeoff_sequence, swarm_args)
+        except KeyboardInterrupt:
+            swarm.parallel(land_sequence, swarm_args)
+
+        except Exception as e:
+            swarm.parallel(land_sequence, swarm_args)
+            print(e)
 
         logger.info('Land sequence...')
-        swarm.parallel_safe(land_sequence, swarm_args)
-
+        swarm.parallel(land_sequence, swarm_args)
+        
     logger.info('Closing QTM connection...')
     qtmWrapper.close()
 
@@ -724,18 +719,6 @@ def run(args):
 
     with Swarm(assign['uris'], factory=factory) as swarm:
         
-        def signal_handler(sig, frame):
-            # TODO: Handle estimator not converging
-            logger.info('You pressed Ctrl+C!')
-            swarm.parallel_safe(land_sequence, swarm_args)
-            time.sleep(1)
-            logger.info('Closing QTM link')
-            qtmWrapper.close()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-        logger.info('Press Ctrl+C to land.')
-    
         try:
             logger.info('Starting mocap data relay...')
             swarm.parallel_safe(send6DOF, swarm_args)
@@ -755,14 +738,14 @@ def run(args):
                 logger.info('Go sequence...')
                 swarm.parallel_safe(go_sequence, swarm_args)
 
-            logger.info('Land sequence...')
-            swarm.parallel_safe(land_sequence, swarm_args)
+        except KeyboardInterrupt:
+            swarm.parallel(land_sequence, swarm_args)
 
         except Exception as e:
             logger.error('general exception: %s', e)
-            logger.error('Aborting go sequence, landing')
-            swarm.parallel_safe(land_sequence, swarm_args)
 
+        logger.info('Land sequence...')
+        swarm.parallel(land_sequence, swarm_args)
 
     logger.info('Closing QTM connection...')
     qtmWrapper.close()
